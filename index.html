@@ -111,6 +111,26 @@
     display:flex;align-items:baseline;gap:6px;}
   .fbadge em{font-style:normal;font-size:9px;letter-spacing:.07em;text-transform:uppercase;
     color:var(--text-dim);font-weight:400;}
+  .mapwrap{background:rgba(255,255,255,.02);border-radius:9px;padding:6px;margin-top:6px;}
+  .rmap{width:100%;height:auto;display:block;}
+
+  .dowgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end;}
+  .dowcol{display:flex;flex-direction:column;align-items:center;gap:5px;}
+  .dowbar{width:100%;background:var(--blue);border-radius:3px 3px 0 0;min-height:3px;}
+  .dowlab{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-dim);
+    text-transform:uppercase;letter-spacing:.04em;}
+  .dowval{font-size:11px;color:var(--text);}
+
+  .gearrow{display:grid;grid-template-columns:1fr 2fr auto;gap:12px;align-items:center;
+    padding:9px 0;border-bottom:1px solid var(--line);}
+  .gearrow:last-child{border-bottom:0;}
+  .gname{font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .gname em{font-style:normal;font-size:10px;color:var(--text-dim);}
+  .gbar{height:7px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;}
+  .gbar i{display:block;height:100%;background:var(--blue);border-radius:4px;}
+  .gval{font-size:12px;color:var(--text-dim);white-space:nowrap;}
+  @media(max-width:600px){.gearrow{grid-template-columns:1fr auto;}.gbar{display:none;}}
+
   .chart-wrap{position:relative;height:190px;margin-top:8px;}
   .chart-wrap.tall{height:230px;}
 
@@ -689,6 +709,154 @@ function secBests(){
       </div>`).join('')}</div>`;
 }
 
+
+/* ------------------------------------------------------------- route map */
+
+function secRoutes(){
+  const R=(D.routes||[]).filter(r=>r.p&&r.p.length>1);
+  if(!R.length) return '';
+  let minLa=90,maxLa=-90,minLo=180,maxLo=-180;
+  R.forEach(r=>r.p.forEach(([la,lo])=>{
+    if(la<minLa)minLa=la; if(la>maxLa)maxLa=la;
+    if(lo<minLo)minLo=lo; if(lo>maxLo)maxLo=lo;}));
+  const midLa=(minLa+maxLa)/2, kx=Math.cos(midLa*Math.PI/180);
+  const W=1000, H=560, pad=18;
+  const sx=(maxLo-minLo)*kx || 1e-6, sy=(maxLa-minLa) || 1e-6;
+  const scale=Math.min((W-pad*2)/sx,(H-pad*2)/sy);
+  const ox=(W-sx*scale)/2, oy=(H-sy*scale)/2;
+  const X=lo=>ox+(lo-minLo)*kx*scale;
+  const Y=la=>H-(oy+(la-minLa)*scale);          // north up
+  const newest=R.reduce((a,b)=>a.d>b.d?a:b).d;
+  const paths=R.map(r=>{
+    const d=r.p.map(([la,lo],i)=>(i?'L':'M')+X(lo).toFixed(1)+' '+Y(la).toFixed(1)).join(' ');
+    const recent=r.d===newest;
+    return `<path d="${d}" fill="none" stroke="${recent?'#e8a33d':'#5b9bd8'}"
+      stroke-width="${recent?2.2:1.1}" stroke-opacity="${recent?0.95:0.30}"
+      stroke-linecap="round" stroke-linejoin="round"/>`;
+  }).join('');
+  return `<div class="card"><div class="ch-title">Where you ride</div>
+    <div class="ch-sub">${R.length} rides overlaid · the amber trace is the most recent</div>
+    <div class="mapwrap"><svg class="rmap" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"
+      role="img" aria-label="All recorded routes overlaid">${paths}</svg></div></div>`;
+}
+
+/* ----------------------------------------------------------- power curve */
+
+function secPower(){
+  const pc=D.power_curve||{};
+  if(!Object.values(pc).some(o=>o&&Object.keys(o).length)) return '';
+  return `<div class="card"><div class="ch-title">Power curve</div>
+    <div class="ch-sub">Best average power held for each duration</div>
+    <div class="chart-wrap tall"><canvas id="c-power"></canvas></div>
+    <p class="desc" style="margin-top:10px;">Derived from sampled power files, so treat
+    these as close rather than exact — and only durations of a minute and up are meaningful.</p>
+    </div>`;
+}
+
+/* --------------------------------------------------- year against year */
+
+function cumulativeMiles(year){
+  const d=D.daily||{}, out=new Array(366).fill(null);
+  let run=0, seen=false;
+  const start=new Date(year,0,1);
+  const end=(year===new Date(D.today.date+'T00:00:00').getFullYear())
+    ? new Date(D.today.date+'T00:00:00') : new Date(year,11,31);
+  for(let k=0;k<366;k++){
+    const dd=new Date(start); dd.setDate(start.getDate()+k);
+    if(dd>end) break;
+    const b=d[iso(dd)];
+    if(b){ run+=(b.m||0)/1609.34; seen=true; }
+    out[k]=run;
+  }
+  return seen?out:null;
+}
+
+function secYoY(){
+  const y=new Date(D.today.date+'T00:00:00').getFullYear();
+  if(!cumulativeMiles(y-1)) return '';
+  return `<div class="card"><div class="ch-title">${y} against ${y-1}</div>
+    <div class="ch-sub">Cumulative distance through the year</div>
+    <div class="chart-wrap"><canvas id="c-yoy"></canvas></div></div>`;
+}
+
+/* ------------------------------------------------------ consistency */
+
+function secStreaks(){
+  const d=D.daily||{}, keys=Object.keys(d).sort();
+  if(!keys.length) return '';
+  const has=k=>!!d[k];
+  // current streak, counting back from today (today itself not yet required)
+  let cur=0, probe=new Date(D.today.date+'T00:00:00');
+  if(!has(iso(probe))) probe.setDate(probe.getDate()-1);
+  while(has(iso(probe))){ cur++; probe.setDate(probe.getDate()-1); }
+  // longest streak across the record
+  let best=0, run=0, prev=null;
+  keys.forEach(k=>{
+    if(prev){
+      const gap=(new Date(k+'T00:00:00')-new Date(prev+'T00:00:00'))/86400000;
+      run = gap===1 ? run+1 : 1;
+    } else run=1;
+    if(run>best) best=run;
+    prev=k;
+  });
+  // days on per week, last 8 weeks
+  const t=new Date(D.today.date+'T00:00:00');
+  const wk=[]; let start=mondayOf(t);
+  for(let w=7;w>=0;w--){
+    const s=new Date(start); s.setDate(start.getDate()-7*w);
+    let n=0;
+    for(let k=0;k<7;k++){ const dd=new Date(s); dd.setDate(s.getDate()+k); if(has(iso(dd))) n++; }
+    wk.push({label:s.toLocaleDateString(undefined,{month:'short',day:'numeric'}),n});
+  }
+  const avg=(wk.reduce((a,b)=>a+b.n,0)/wk.length).toFixed(1);
+  // weekday fingerprint
+  const dow=[0,0,0,0,0,0,0];
+  keys.forEach(k=>{ dow[(new Date(k+'T00:00:00').getDay()+6)%7]++; });
+  const dmax=Math.max(...dow,1);
+  const names=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  return `<div class="card"><div class="ch-title">Consistency</div>
+    <div class="ch-sub">Streaks and the days you actually train</div>
+    <div class="form-row" style="margin-bottom:14px;">
+      <div class="fm"><div class="k">Current streak</div><div class="v">${cur}</div>
+        <div class="s">${cur===1?'day':'days'}</div></div>
+      <div class="fm"><div class="k">Longest</div><div class="v">${best}</div><div class="s">days</div></div>
+      <div class="fm"><div class="k">Days on / week</div><div class="v">${avg}</div>
+        <div class="s">last 8 weeks</div></div>
+    </div>
+    <div class="dowgrid">
+      ${names.map((n,k)=>`<div class="dowcol">
+        <div class="dowbar" style="height:${Math.max(3,Math.round(dow[k]/dmax*56))}px"></div>
+        <div class="dowlab">${n}</div>
+        <div class="dowval num">${dow[k]}</div></div>`).join('')}
+    </div></div>`;
+}
+
+/* ------------------------------------------------------------- weather */
+
+function secWeather(){
+  const w=(D.weather||[]).filter(x=>x.temp!=null&&x.hr);
+  if(w.length<5) return '';
+  return `<div class="card"><div class="ch-title">Heat</div>
+    <div class="ch-sub">Heart rate against temperature, ${w.length} rides</div>
+    <div class="chart-wrap"><canvas id="c-weather"></canvas></div></div>`;
+}
+
+/* ---------------------------------------------------------------- gear */
+
+function secGear(){
+  const g=(D.gear||[]).filter(x=>x.meters);
+  if(!g.length) return '';
+  g.sort((a,b)=>b.meters-a.meters);
+  const max=g[0].meters||1;
+  return `<div class="card"><div class="ch-title">Gear</div>
+    <div class="ch-sub">Distance logged per bike</div>
+    ${g.map(x=>`<div class="gearrow">
+      <span class="gname">${esc(x.name)}${x.retired?' <em>retired</em>':''}</span>
+      <span class="gbar"><i style="width:${(x.meters/max*100).toFixed(0)}%"></i></span>
+      <span class="gval num">${Math.round(mi(x.meters)).toLocaleString()} mi</span>
+    </div>`).join('')}</div>`;
+}
+
 /* ------------------------------------------------------------------ charts */
 
 function chart(id, cfg){
@@ -707,13 +875,37 @@ function chart(id, cfg){
 function charts(){
   const f=D.form;
   if(f && f.series && f.series.length>2 && $('c-form')){
-    chart('c-form', {type:'line', data:{
-      labels:f.series.map(s=>new Date(s.date+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),
-      datasets:[
-        {label:'Fitness (CTL)',data:f.series.map(s=>s.ctl),borderColor:'#5b9bd8',
+    // project CTL/ATL forward across the planned sessions
+    const plan={};
+    (D.upcoming||[]).forEach(e=>{ plan[e.date]=(plan[e.date]||0)+(e.load||0); });
+    const futureDates=Object.keys(plan).sort();
+    const horizon=futureDates.length?futureDates[futureDates.length-1]:null;
+    const proj=[];
+    if(horizon){
+      let ctl=f.ctl, atl=f.atl;
+      let d=new Date(D.today.date+'T00:00:00');
+      const end=new Date(horizon+'T00:00:00');
+      while(d<=end){
+        d.setDate(d.getDate()+1);
+        const tss=plan[iso(d)]||0;
+        ctl+=(tss-ctl)/42; atl+=(tss-atl)/7;
+        proj.push({date:iso(d),ctl:+ctl.toFixed(1),atl:+atl.toFixed(1)});
+      }
+    }
+    f._proj=proj;
+    const hist=f.series, proj2=f._proj||[];
+    const labels=hist.concat(proj2).map(x=>
+      new Date(x.date+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}));
+    const pad=new Array(hist.length-1).fill(null);
+    chart('c-form', {type:'line', data:{labels, datasets:[
+        {label:'Fitness (CTL)',data:hist.map(x=>x.ctl),borderColor:'#5b9bd8',
          backgroundColor:'rgba(91,155,216,.13)',fill:true,tension:.3,pointRadius:0,borderWidth:2},
-        {label:'Fatigue (ATL)',data:f.series.map(s=>s.atl),borderColor:'#e8686f',
-         fill:false,tension:.3,pointRadius:0,borderWidth:1.5,borderDash:[5,4]}
+        {label:'Fatigue (ATL)',data:hist.map(x=>x.atl),borderColor:'#e8686f',
+         fill:false,tension:.3,pointRadius:0,borderWidth:1.5,borderDash:[5,4]},
+        ...(proj2.length?[{label:'Projected',
+         data:pad.concat([hist[hist.length-1].ctl], proj2.map(x=>x.ctl)),
+         borderColor:'#6fb3c9',fill:false,tension:.3,pointRadius:0,borderWidth:2,
+         borderDash:[2,3]}]:[])
       ]}, options:merge({interaction:{mode:'index',intersect:false}})});
   }
 
@@ -742,6 +934,56 @@ function charts(){
         y1:{position:'right',grid:{display:false},border:{display:false},
             ticks:{color:'#4fc78a',font:{family:'IBM Plex Mono',size:9.5}}}
       })})});
+  }
+
+  // power curve
+  const pc=D.power_curve||{}, durs=(D.peak_durations||[60,300,600,1200,3600]);
+  if($('c-power')){
+    const fmt=d=>d>=3600?(d/3600)+'h':(d/60)+'m';
+    const sets=[['42d','Last 6 weeks','#e8a33d'],['90d','Last 90 days','#5b9bd8'],
+                ['all','All time','#4fc78a']]
+      .filter(([k])=>pc[k]&&Object.keys(pc[k]).length)
+      .map(([k,label,col])=>({label,data:durs.map(d=>pc[k][String(d)]??null),
+        borderColor:col,backgroundColor:col+'22',tension:.35,pointRadius:3,
+        borderWidth:k==='42d'?2.5:1.8,fill:false,spanGaps:true}));
+    chart('c-power',{type:'line',data:{labels:durs.map(fmt),datasets:sets},
+      options:merge({interaction:{mode:'index',intersect:false},
+        scales:Object.assign({},CHART_BASE.scales,{
+          y:{grid:{color:'rgba(255,255,255,.06)'},border:{display:false},
+             ticks:{color:'#8993a3',font:{family:'IBM Plex Mono',size:9.5},callback:v=>v+'W'}}})})});
+  }
+
+  // this year against last
+  if($('c-yoy')){
+    const yr=new Date(D.today.date+'T00:00:00').getFullYear();
+    const a=cumulativeMiles(yr), b=cumulativeMiles(yr-1);
+    const labels=[...Array(366)].map((_,k)=>{
+      const d=new Date(yr,0,1); d.setDate(d.getDate()+k);
+      return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});});
+    chart('c-yoy',{type:'line',data:{labels,datasets:[
+      {label:String(yr),data:a,borderColor:'#5b9bd8',backgroundColor:'rgba(91,155,216,.13)',
+       fill:true,tension:.2,pointRadius:0,borderWidth:2.2,spanGaps:true},
+      {label:String(yr-1),data:b,borderColor:'#8993a3',fill:false,tension:.2,
+       pointRadius:0,borderWidth:1.5,borderDash:[5,4],spanGaps:true}
+    ]},options:merge({interaction:{mode:'index',intersect:false},
+      scales:Object.assign({},CHART_BASE.scales,{
+        y:{grid:{color:'rgba(255,255,255,.06)'},border:{display:false},
+           ticks:{color:'#8993a3',font:{family:'IBM Plex Mono',size:9.5},
+                  callback:v=>Math.round(v)+'mi'}}})})});
+  }
+
+  // heat: heart rate against temperature
+  const wx=(D.weather||[]).filter(x=>x.temp!=null&&x.hr);
+  if(wx.length>=5 && $('c-weather')){
+    chart('c-weather',{type:'scatter',data:{datasets:[{label:'Rides',
+      data:wx.map(x=>({x:x.temp*9/5+32,y:x.hr})),
+      backgroundColor:'rgba(232,104,111,.6)',borderColor:'#e8686f',pointRadius:4}]},
+      options:merge({plugins:{legend:{display:false}},scales:{
+        x:{grid:{color:'rgba(255,255,255,.06)'},border:{display:false},
+           title:{display:true,text:'°F',color:'#8993a3',font:{size:10}},
+           ticks:{color:'#8993a3',font:{family:'IBM Plex Mono',size:9.5}}},
+        y:{grid:{color:'rgba(255,255,255,.06)'},border:{display:false},
+           ticks:{color:'#8993a3',font:{family:'IBM Plex Mono',size:9.5},callback:v=>v+' bpm'}}}})});
   }
 
   const wl=(D.wellness||[]).filter(x=>x.weight||x.rhr);
@@ -840,8 +1082,12 @@ async function load(){
   $('app').innerHTML =
       secForm() + secStats() + secCalendar()
     + `<div class="grid2">${secWeekly()}${secMonthly()}</div>`
+    + secRoutes()
+    + `<div class="grid2">${secPower()}${secYoY()}</div>`
     + secZones()
+    + `<div class="grid2">${secStreaks()}${secWeather()}</div>`
     + `<div class="grid2">${secWellness()}${secBests()}</div>`
+    + secGear()
     + secRecent();
 
   drawStats();
