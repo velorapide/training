@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Training">
 <meta name="theme-color" content="#0d131c">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -15,94 +16,163 @@
     --bg:#0d131c; --card:#141c28; --card-hi:#1a2432;
     --line:rgba(255,255,255,0.08); --line-strong:rgba(255,255,255,0.15);
     --text:#e7ebf1; --text-dim:#8993a3;
-    --blue:#5b9bd8; --sky:#6fb3c9; --amber:#e8a33d; --green:#4fc78a; --violet:#c77dd2; --red:#e8686f;
-    --shadow:0 1px 2px rgba(0,0,0,0.2), 0 4px 16px rgba(0,0,0,0.25);
+    --blue:#5b9bd8; --sky:#6fb3c9; --amber:#e8a33d; --green:#4fc78a;
+    --violet:#c77dd2; --red:#e8686f; --slate:#5a6675;
+    --shadow:0 1px 2px rgba(0,0,0,.2), 0 4px 16px rgba(0,0,0,.25);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,sans-serif;
-    min-height:100vh;-webkit-font-smoothing:antialiased;}
+    -webkit-font-smoothing:antialiased;}
   .num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;}
-  .wrap{max-width:560px;margin:0 auto;padding:0 18px 40px;}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 18px 70px;}
   :focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  button{font:inherit;color:inherit;}
 
-  header{padding:26px 0 16px;position:relative;}
-  header::before{content:"";position:absolute;top:-40px;left:-10%;width:75%;height:200px;
-    background:radial-gradient(ellipse at top left, rgba(91,155,216,0.20), transparent 65%);
-    pointer-events:none;z-index:0;}
-  header > *{position:relative;z-index:1;}
-  .hdr-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  header{padding:26px 0 14px;position:relative;}
+  header::before{content:"";position:absolute;top:-40px;left:-10%;width:70%;height:210px;
+    background:radial-gradient(ellipse at top left,rgba(91,155,216,.20),transparent 65%);z-index:0;}
+  header::after{content:"";position:absolute;top:-20px;right:-5%;width:50%;height:180px;
+    background:radial-gradient(ellipse at top right,rgba(232,163,61,.11),transparent 65%);z-index:0;}
+  header>*{position:relative;z-index:1;}
+  .hdr-top{display:flex;align-items:center;gap:8px;margin-bottom:9px;}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;}
   .dot.stale{background:var(--amber);} .dot.dead{background:var(--red);}
   .dot.live{animation:pulse 2.4s ease-in-out infinite;}
   @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(79,199,138,.5);}
-                   50%{opacity:.5;box-shadow:0 0 0 6px rgba(79,199,138,0);}}
+    50%{opacity:.5;box-shadow:0 0 0 6px rgba(79,199,138,0);}}
   .stamp{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.09em;
     text-transform:uppercase;color:var(--text-dim);}
   .today-date{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-dim);}
-  h1{font-size:23px;font-weight:700;margin:0;letter-spacing:-.01em;}
+  h1{font-size:24px;font-weight:700;margin:0;letter-spacing:-.01em;}
 
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
-    box-shadow:var(--shadow);margin-bottom:12px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:11px;
+    box-shadow:var(--shadow);margin-bottom:14px;padding:16px 18px;}
   .lab{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.11em;
     text-transform:uppercase;color:var(--text-dim);}
+  .ch-title{font-size:12.5px;font-weight:600;color:var(--text-dim);text-transform:uppercase;
+    letter-spacing:.05em;margin-bottom:3px;}
+  .ch-sub{font-size:11px;color:var(--text-dim);margin-bottom:14px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:800px){.grid2{grid-template-columns:1fr;}}
 
   /* today */
-  .today{padding:18px;border-top:3px solid var(--blue);}
-  .today.rest{border-top-color:#3a4a5c;}
+  .today{border-top:3px solid var(--blue);}
+  .today.rest{border-top-color:var(--slate);}
   .today.done{border-top-color:var(--green);}
-  .today .lab{margin-bottom:9px;display:flex;align-items:center;gap:7px;}
-  .today h2{font-size:21px;font-weight:700;margin:0 0 8px;letter-spacing:-.01em;line-height:1.25;}
-  .today .desc{font-size:13.5px;color:var(--text-dim);line-height:1.55;margin:0;
-    white-space:pre-wrap;word-break:break-word;}
-  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
-  .nextup{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);}
-  .nextup .nx-name{font-size:17px;font-weight:700;margin-bottom:6px;letter-spacing:-.01em;}
-  .today.rest .nextup .nx-name{color:var(--blue);}
+  .today h2{font-size:20px;font-weight:700;margin:7px 0 7px;letter-spacing:-.01em;}
+  .desc{font-size:13.5px;color:var(--text-dim);line-height:1.55;margin:0;white-space:pre-wrap;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px;}
   .chip{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 9px;border-radius:14px;
     border:1px solid var(--line);background:var(--card-hi);color:var(--text-dim);}
   .chip.on{border-color:rgba(79,199,138,.45);color:var(--green);}
+  .nextup{margin-top:13px;padding-top:13px;border-top:1px solid var(--line);}
+  .nextup .nx-name{font-size:16px;font-weight:700;color:var(--blue);margin-bottom:5px;}
+  .cd{display:flex;align-items:center;gap:13px;border-top:3px solid var(--amber);}
+  .cd .n{font-family:'IBM Plex Mono',monospace;font-size:29px;font-weight:600;color:var(--amber);line-height:1;}
+  .cd .t{font-size:14px;font-weight:600;}
+  .cd .d{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:2px;}
 
-  /* countdown */
-  .cd{padding:14px 18px;display:flex;align-items:center;gap:14px;border-top:3px solid var(--amber);}
-  .cd .n{font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:600;
-    color:var(--amber);line-height:1;}
-  .cd .who{min-width:0;}
-  .cd .who .t{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .cd .who .d{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:2px;}
+  /* stat strip */
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px;}
+  @media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr);}}
+  .stat{background:var(--card);border:1px solid var(--line);border-top:3px solid var(--line-strong);
+    border-radius:11px;padding:11px 14px;box-shadow:var(--shadow);}
+  .stat .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);}
+  .stat .v{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;margin-top:3px;}
+  .stat .v small{font-size:10.5px;color:var(--text-dim);font-weight:400;margin-left:3px;}
 
   /* form */
-  .form-card{padding:16px 18px 14px;}
-  .form-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0 4px;}
-  .fm{text-align:left;}
+  .form-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0 6px;}
   .fm .k{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.07em;
     text-transform:uppercase;color:var(--text-dim);margin-bottom:3px;}
-  .fm .v{font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:600;line-height:1;}
+  .fm .v{font-family:'IBM Plex Mono',monospace;font-size:23px;font-weight:600;line-height:1;}
   .fm .s{font-size:10.5px;color:var(--text-dim);margin-top:4px;}
-  .spark{width:100%;height:38px;display:block;margin-top:10px;overflow:visible;}
-  .spark polyline{fill:none;stroke:var(--blue);stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round;}
-  .spark .fill{stroke:none;fill:var(--blue);opacity:.13;}
+  .chart-wrap{position:relative;height:190px;margin-top:8px;}
+  .chart-wrap.tall{height:230px;}
 
-  /* week strip */
-  .week-card{padding:16px 18px 14px;}
-  .week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;align-items:end;height:52px;margin-top:12px;}
-  .wb{background:var(--card-hi);border-radius:3px 3px 0 0;min-height:3px;position:relative;}
-  .wdays{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:6px;}
-  .wdays span{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-dim);text-align:center;}
-  .wdays span.today{color:var(--amber);font-weight:600;}
+  /* calendar */
+  .cal-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+  .cal-head .m{font-size:13px;font-weight:600;margin-left:auto;font-family:'IBM Plex Mono',monospace;}
+  .cal-nav{display:flex;gap:3px;}
+  .cal-nav button{width:24px;height:24px;border-radius:6px;background:none;border:1px solid var(--line);
+    color:var(--text-dim);cursor:pointer;line-height:1;}
+  .cal-nav button:hover{background:var(--card-hi);color:var(--text);}
+  .cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px;}
+  .cal-dow span{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-dim);
+    text-align:center;text-transform:uppercase;letter-spacing:.06em;}
+  .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .cell{aspect-ratio:1;border-radius:6px;background:rgba(255,255,255,.025);border:1px solid transparent;
+    padding:4px 5px;display:flex;flex-direction:column;gap:2px;min-width:0;cursor:default;position:relative;}
+  .cell.out{opacity:.28;}
+  .cell.today{border-color:var(--amber);}
+  .cell .dnum{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--text-dim);line-height:1;}
+  .cell.today .dnum{color:var(--amber);font-weight:600;}
+  .cell .bars{margin-top:auto;display:flex;flex-direction:column;gap:2px;}
+  .cell .bar{height:4px;border-radius:2px;}
+  .cell .bar.a{background:var(--blue);}
+  .cell .bar.p{background:rgba(232,163,61,.55);}
+  .cell .ld{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text);line-height:1;}
+  .cal-key{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:12px;
+    font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;
+    letter-spacing:.04em;color:var(--text-dim);}
+  .cal-key span{display:flex;align-items:center;gap:6px;}
+  .cal-key i{width:10px;height:10px;border-radius:2px;}
 
-  /* ftp footer */
-  .ftp{padding:13px 18px;display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline;}
-  .ftp .item{display:flex;align-items:baseline;gap:6px;}
-  .ftp .k{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.07em;
-    text-transform:uppercase;color:var(--text-dim);}
-  .ftp .v{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:var(--text);}
-  .ftp .v.amber{color:var(--amber);}
+  /* zones */
+  .tz-bar{display:flex;height:28px;border-radius:5px;overflow:hidden;background:rgba(255,255,255,.04);margin-top:10px;}
+  .tz-seg{display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;
+    font-size:9.5px;color:rgba(13,19,28,.85);font-weight:600;min-width:0;}
+  .tz-key{display:flex;flex-wrap:wrap;gap:7px 15px;margin-top:12px;
+    font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;
+    letter-spacing:.04em;color:var(--text-dim);}
+  .tz-key span{display:flex;align-items:center;gap:6px;}
+  .tz-key i{width:10px;height:10px;border-radius:2px;}
 
-  .msg{padding:26px 18px;text-align:center;color:var(--text-dim);font-size:13.5px;line-height:1.6;}
-  .msg code{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--sky);}
-  footer{margin-top:14px;font-family:'IBM Plex Mono',monospace;font-size:10px;
+  /* table */
+  .tbl-head,.row{display:grid;grid-template-columns:64px 1.5fr 64px 64px 58px 58px 52px;
+    gap:10px;align-items:center;}
+  .tbl-head{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--text-dim);padding:0 2px 9px;border-bottom:1px solid var(--line);}
+  .row{padding:10px 2px;border-bottom:1px solid var(--line);cursor:pointer;
+    background:none;border-left:0;border-right:0;border-top:0;width:100%;text-align:left;}
+  .row:hover{background:rgba(255,255,255,.03);}
+  .row:last-child{border-bottom:0;}
+  .row .when{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);}
+  .row .nm{display:flex;align-items:center;gap:8px;min-width:0;}
+  .row .nm .pip{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .row .nm span{font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .row .n{font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-align:right;}
+  .row .n.dim{color:var(--text-dim);}
+  .rt{text-align:right;}
+  @media(max-width:700px){
+    .tbl-head{display:none;}
+    .row{grid-template-columns:52px 1fr 52px;}
+    .row .hide{display:none;}
+  }
+
+  .msg{padding:30px 4px;text-align:center;color:var(--text-dim);font-size:13.5px;line-height:1.6;}
+  .msg code{font-family:'IBM Plex Mono',monospace;color:var(--sky);}
+  footer{margin-top:16px;font-family:'IBM Plex Mono',monospace;font-size:10px;
     color:var(--text-dim);text-align:center;}
+
+  /* modal */
+  .backdrop{position:fixed;inset:0;background:rgba(5,8,12,.65);backdrop-filter:blur(2px);
+    display:none;align-items:flex-end;justify-content:center;z-index:50;}
+  .backdrop.open{display:flex;}
+  @media(min-width:640px){.backdrop{align-items:center;}}
+  .modal{background:var(--card);border:1px solid var(--line-strong);border-radius:14px 14px 0 0;
+    width:100%;max-width:520px;max-height:88vh;overflow-y:auto;padding:22px 20px 26px;position:relative;}
+  @media(min-width:640px){.modal{border-radius:14px;}}
+  .modal h2{font-size:19px;margin:0 0 2px;padding-right:34px;}
+  .modal .mdate{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);margin-bottom:15px;}
+  .mclose{position:absolute;top:13px;right:13px;background:var(--card-hi);border:1px solid var(--line-strong);
+    color:var(--text-dim);width:29px;height:29px;border-radius:50%;cursor:pointer;}
+  .mgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .mgrid div{background:var(--card-hi);border:1px solid var(--line);border-radius:8px;padding:9px 11px;}
+  .mgrid .k{font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--text-dim);margin-bottom:3px;}
+  .mgrid .v{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600;}
 </style>
 </head>
 <body>
@@ -119,202 +189,421 @@
   <footer id="foot"></footer>
 </div>
 
+<div class="backdrop" id="backdrop">
+  <div class="modal"><button class="mclose" id="mclose" aria-label="Close">✕</button>
+    <div id="mbody"></div></div>
+</div>
+
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const hm = s => !s ? null : Math.floor(s/3600) + 'h' + String(Math.round(s%3600/60)).padStart(2,'0');
+const mi = m => m ? (m/1609.34) : 0;
+const ft = m => m ? (m*3.28084) : 0;
+const ZC = ['#5a6675','#5b9bd8','#4fc78a','#e8a33d','#e8686f','#c77dd2','#8b5cf6'];
+const SPORT = {Ride:'#5b9bd8', VirtualRide:'#6fb3c9', MountainBikeRide:'#4fc78a',
+               Run:'#e8a33d', Walk:'#c77dd2', Hike:'#c77dd2', Swim:'#6fb3c9'};
+const sportCol = t => SPORT[t] || '#5b9bd8';
+let D = null, calMonth = null;
 
-function formVerdict(tsb){
-  if (tsb >  15) return ['fresh, maybe too fresh', 'var(--sky)'];
-  if (tsb >   5) return ['fresh', 'var(--green)'];
-  if (tsb >  -8) return ['neutral', 'var(--text)'];
-  if (tsb > -25) return ['building', 'var(--amber)'];
-  return ['deep in it', 'var(--red)'];
-}
-
-function sparkline(vals){
-  if (!vals || vals.length < 3) return '';
-  const w = 480, h = 38;
-  const max = Math.max(...vals), min = Math.min(...vals), span = (max - min) || 1;
-  const pts = vals.map((v,i) => [
-    (i * w / (vals.length - 1)).toFixed(1),
-    (h - 3 - ((v - min) / span) * (h - 8)).toFixed(1)
-  ]);
-  const line = pts.map(p => p.join(',')).join(' ');
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
-      <polyline class="fill" points="0,${h} ${line} ${w},${h}"/>
-      <polyline points="${line}"/></svg>`;
-}
+const CHART_BASE = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#8993a3',font:{family:'Inter',size:11},
+    boxWidth:12,usePointStyle:true}}},
+  scales:{
+    x:{grid:{display:false},border:{display:false},
+       ticks:{color:'#8993a3',font:{family:'IBM Plex Mono',size:9.5},maxRotation:0,autoSkipPadding:14}},
+    y:{grid:{color:'rgba(255,255,255,.06)'},border:{display:false},
+       ticks:{color:'#8993a3',font:{family:'IBM Plex Mono',size:9.5}}}
+  }
+};
+const merge = o => JSON.parse(JSON.stringify(CHART_BASE)) && Object.assign(
+  JSON.parse(JSON.stringify(CHART_BASE)), o);
 
 function whenLabel(iso){
-  const d = new Date(iso + 'T00:00:00');
-  const days = Math.round((d - new Date(new Date().toDateString())) / 86400000);
-  if (days === 0) return 'today';
-  if (days === 1) return 'tomorrow';
-  return d.toLocaleDateString(undefined, {weekday:'long'}) +
-         (days > 6 ? ', ' + d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '') +
-         ' · ' + days + ' days';
+  const d = new Date(iso+'T00:00:00');
+  const days = Math.round((d - new Date(new Date().toDateString()))/86400000);
+  if(days===0) return 'today';
+  if(days===1) return 'tomorrow';
+  return d.toLocaleDateString(undefined,{weekday:'long'}) + ' · ' + days + ' days';
+}
+function formVerdict(t){
+  if(t>15) return ['fresh, maybe too fresh','var(--sky)'];
+  if(t>5)  return ['fresh','var(--green)'];
+  if(t>-8) return ['neutral','var(--text)'];
+  if(t>-25)return ['building','var(--amber)'];
+  return ['deep in it','var(--red)'];
 }
 
-function renderToday(d){
-  const p = (d.today.planned || [])[0];
-  const done = d.today.completed || [];
-  const doneLoad = done.reduce((x,a) => x + (a.load || 0), 0);
+/* ---------------------------------------------------------------- sections */
 
-  let cls = 'today', lab = 'Today', body;
-  if (p) {
-    const chips = [];
-    if (p.duration_s) chips.push(hm(p.duration_s));
-    if (p.load) chips.push(p.load + ' TSS');
-    done.forEach(a => chips.push(`<span class="chip on">done · ${esc(hm(a.duration_s) || '')}</span>`));
+function secToday(){
+  const p = (D.today.planned||[])[0], done = D.today.completed||[];
+  let cls='today', body;
+  if(p){
+    const chips=[];
+    if(p.secs) chips.push(hm(p.secs));
+    if(p.load) chips.push(p.load+' TSS');
     body = `<h2>${esc(p.name)}</h2>` +
-      (p.description ? `<p class="desc">${esc(p.description.trim())}</p>` : '') +
-      `<div class="chips">` +
-        chips.map(c => c.startsWith('<') ? c : `<span class="chip">${esc(c)}</span>`).join('') +
-      `</div>`;
-    if (done.length) cls += ' done';
-  } else if (done.length) {
-    cls += ' done';
-    body = `<h2>${esc(done[0].name)}</h2>
-      <p class="desc">Nothing was scheduled — this one was yours.</p>
-      <div class="chips"><span class="chip on">${esc(hm(done[0].duration_s) || '')}</span>` +
-      (doneLoad ? `<span class="chip">${doneLoad} TSS</span>` : '') + `</div>`;
+      (p.description?`<p class="desc">${esc(p.description.trim())}</p>`:'') +
+      `<div class="chips">${chips.map(c=>`<span class="chip">${esc(c)}</span>`).join('')}` +
+      done.map(a=>`<span class="chip on">done · ${esc(hm(a.secs)||'')}</span>`).join('') + `</div>`;
+    if(done.length) cls+=' done';
+  } else if(done.length){
+    cls+=' done';
+    const a=done[0];
+    body = `<h2>${esc(a.name)}</h2><p class="desc">Nothing was scheduled — this one was yours.</p>
+      <div class="chips"><span class="chip on">${esc(hm(a.secs)||'')}</span>` +
+      (a.load?`<span class="chip">${a.load} TSS</span>`:'') + `</div>`;
   } else {
-    // Nothing today. The useful fact is what's next, not that today is blank.
-    const nxt = (d.upcoming || []).find(u => u.date > d.today.date);
-    cls += ' rest';
-    if (nxt) {
-      lab = 'Today · rest';
-      const chips = [];
-      if (nxt.duration_s) chips.push(hm(nxt.duration_s));
-      if (nxt.load) chips.push(nxt.load + ' TSS');
-      body = `<h2>Rest day</h2>
-        <div class="nextup">
-          <div class="lab" style="margin-bottom:6px;">Next · ${esc(whenLabel(nxt.date))}</div>
-          <div class="nx-name">${esc(nxt.name)}</div>` +
-          (nxt.description ? `<p class="desc">${esc(nxt.description.trim())}</p>` : '') +
-          `<div class="chips">` +
-            chips.map(c => `<span class="chip">${esc(c)}</span>`).join('') +
-          `</div>
-        </div>`;
-    } else {
-      body = `<h2>Rest day</h2><p class="desc">Nothing on the calendar. Stay off the legs.</p>`;
-    }
+    cls+=' rest';
+    const nxt=(D.upcoming||[]).find(u=>u.date>D.today.date);
+    body = `<h2>Rest day</h2>`;
+    if(nxt){
+      const chips=[]; if(nxt.secs) chips.push(hm(nxt.secs)); if(nxt.load) chips.push(nxt.load+' TSS');
+      body += `<div class="nextup"><div class="lab" style="margin-bottom:6px;">Next · ${esc(whenLabel(nxt.date))}</div>
+        <div class="nx-name">${esc(nxt.name)}</div>` +
+        (nxt.description?`<p class="desc">${esc(nxt.description.trim())}</p>`:'') +
+        `<div class="chips">${chips.map(c=>`<span class="chip">${esc(c)}</span>`).join('')}</div></div>`;
+    } else body += `<p class="desc">Nothing on the calendar.</p>`;
   }
-  return `<div class="card ${cls}"><div class="lab">${lab}</div>${body}</div>`;
+  return `<div class="card ${cls}"><div class="lab">Today</div>${body}</div>`;
 }
 
-function renderCountdown(b){
-  if (!b) return '';
-  const when = new Date(b.date + 'T00:00:00')
-    .toLocaleDateString(undefined, {weekday:'short', month:'short', day:'numeric'});
-  const n = b.days <= 0 ? 'today' : b.days;
-  return `<div class="card cd">
-      <span class="n">${esc(n)}</span>
-      <div class="who">
-        <div class="t">${esc(b.name)}</div>
-        <div class="d">${esc(when)}${b.days > 0 ? ' · days away' : ''}</div>
-      </div></div>`;
+function secCountdown(){
+  const b=D.next_benchmark; if(!b) return '';
+  const when=new Date(b.date+'T00:00:00').toLocaleDateString(undefined,
+    {weekday:'short',month:'short',day:'numeric'});
+  return `<div class="card cd"><span class="n">${b.days<=0?'today':b.days}</span>
+    <div><div class="t">${esc(b.name)}</div>
+    <div class="d">${esc(when)}${b.days>0?' · days away':''}</div></div></div>`;
 }
 
-function renderForm(f){
-  if (!f || (!f.ctl && !f.atl)) return '';
-  const [verdict, col] = formVerdict(f.tsb);
-  return `<div class="card form-card">
-      <div class="lab">Form</div>
-      <div class="form-row">
-        <div class="fm"><div class="k">Fitness</div><div class="v">${f.ctl}</div><div class="s">CTL</div></div>
-        <div class="fm"><div class="k">Fatigue</div><div class="v">${f.atl}</div><div class="s">ATL</div></div>
-        <div class="fm"><div class="k">Form</div>
-          <div class="v" style="color:${col}">${f.tsb > 0 ? '+' : ''}${f.tsb}</div>
-          <div class="s">${esc(verdict)}</div></div>
-      </div>
-      ${sparkline(f.ctl_series)}
-      <div class="s" style="font-size:10px;color:var(--text-dim);margin-top:2px;">Fitness, last 90 days</div>
+function secStats(){
+  const y=D.ytd||{}, a=D.athlete||{};
+  const cards=[
+    ['#5b9bd8','Rides '+y.year, y.rides, ''],
+    ['#6fb3c9','Time', y.hours, 'h'],
+    ['#4fc78a','Distance', (y.miles||0).toLocaleString(), 'mi'],
+    ['#c77dd2','Climbing', (y.feet||0).toLocaleString(), 'ft'],
+    ['#e8a33d','FTP', a.ftp ?? '—', a.wkg?('W · '+a.wkg+' w/kg'):'W'],
+  ];
+  return `<div class="stats">` + cards.map(([c,k,v,u])=>
+    `<div class="stat" style="border-top-color:${c}">
+       <div class="k" style="color:${c}">${esc(k)}</div>
+       <div class="v">${esc(v)}<small>${esc(u)}</small></div></div>`).join('') + `</div>`;
+}
+
+function secForm(){
+  const f=D.form; if(!f) return '';
+  const [v,col]=formVerdict(f.tsb);
+  return `<div class="card"><div class="ch-title">Form</div>
+    <div class="ch-sub">Fitness, fatigue and freshness — intervals.icu's numbers</div>
+    <div class="form-row">
+      <div class="fm"><div class="k">Fitness</div><div class="v">${f.ctl}</div><div class="s">CTL</div></div>
+      <div class="fm"><div class="k">Fatigue</div><div class="v">${f.atl}</div><div class="s">ATL</div></div>
+      <div class="fm"><div class="k">Form</div><div class="v" style="color:${col}">${f.tsb>0?'+':''}${f.tsb}</div>
+        <div class="s">${esc(v)}</div></div>
+    </div>
+    <div class="chart-wrap"><canvas id="c-form"></canvas></div></div>`;
+}
+
+function secCalendar(){
+  return `<div class="card">
+    <div class="cal-head"><div><div class="ch-title" style="margin:0">Calendar</div>
+      <div class="ch-sub" style="margin:0">Planned against completed</div></div>
+      <span class="m" id="cal-month"></span>
+      <div class="cal-nav"><button id="cal-prev" aria-label="Previous month">‹</button>
+        <button id="cal-next" aria-label="Next month">›</button></div></div>
+    <div class="cal-dow">${['M','T','W','T','F','S','S'].map(d=>`<span>${d}</span>`).join('')}</div>
+    <div class="cal" id="cal"></div>
+    <div class="cal-key">
+      <span><i style="background:var(--blue)"></i>Completed</span>
+      <span><i style="background:rgba(232,163,61,.55)"></i>Planned</span>
+      <span>Bar length = training load</span></div></div>`;
+}
+
+function drawCalendar(){
+  const el=$('cal'); if(!el) return;
+  const first=new Date(calMonth.getFullYear(), calMonth.getMonth(), 1);
+  const lead=(first.getDay()+6)%7;
+  const start=new Date(first); start.setDate(1-lead);
+  const todayISO=D.today.date;
+  const cal=D.calendar||{};
+  const loads=Object.values(cal).flatMap(c=>[c.al||0,c.pl||0]);
+  const max=Math.max(...loads,60);
+  $('cal-month').textContent=calMonth.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+
+  let html='';
+  for(let i=0;i<42;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const c=cal[iso];
+    const out=d.getMonth()!==calMonth.getMonth();
+    const cls='cell'+(out?' out':'')+(iso===todayISO?' today':'');
+    let bars='';
+    if(c){
+      if(c.al) bars+=`<div class="bar a" style="width:${Math.max(12,Math.min(100,c.al/max*100))}%"></div>`;
+      if(c.pl && !c.al) bars+=`<div class="bar p" style="width:${Math.max(12,Math.min(100,c.pl/max*100))}%"></div>`;
+    }
+    const load=c&&c.al?`<div class="ld">${Math.round(c.al)}</div>`:'';
+    html+=`<div class="${cls}" data-d="${iso}" title="${esc(iso)}">
+      <div class="dnum">${d.getDate()}</div>${load}<div class="bars">${bars}</div></div>`;
+  }
+  el.innerHTML=html;
+  el.querySelectorAll('.cell').forEach(cell=>{
+    const c=cal[cell.dataset.d];
+    if(!c) return;
+    cell.style.cursor='pointer';
+    cell.addEventListener('click',()=>openDay(cell.dataset.d));
+  });
+}
+
+function secWeekly(){
+  return `<div class="card"><div class="ch-title">Weekly load</div>
+    <div class="ch-sub">Planned against completed, last 26 weeks</div>
+    <div class="chart-wrap tall"><canvas id="c-week"></canvas></div></div>`;
+}
+function secMonthly(){
+  return `<div class="card"><div class="ch-title">Monthly volume</div>
+    <div class="ch-sub">Hours and distance by month</div>
+    <div class="chart-wrap"><canvas id="c-month"></canvas></div></div>`;
+}
+
+function secZones(){
+  const z=D.zones_30; if(!z||!z.some(v=>v)) return '';
+  const total=z.reduce((a,b)=>a+b,0)||1;
+  const names=['Z1','Z2','Z3','Z4','Z5','Z6','Z7'];
+  const segs=z.map((s,i)=>{
+    const p=s/total*100;
+    return `<div class="tz-seg" style="width:${p}%;background:${ZC[i]}"
+      title="${names[i]} · ${Math.round(s/60)} min">${p>=8?Math.round(p)+'%':''}</div>`;
+  }).join('');
+  const z2=Math.round(z[1]/total*100);
+  return `<div class="card"><div class="ch-title">Time in zone</div>
+    <div class="ch-sub">Last 30 days · ${Math.round(total/3600)} h recorded with power</div>
+    <div class="tz-bar">${segs}</div>
+    <div class="tz-key">${z.map((s,i)=>s?`<span><i style="background:${ZC[i]}"></i>${names[i]} ${Math.round(s/60)}m</span>`:'').join('')}</div>
+    <p class="desc" style="margin-top:13px;">Zone 2 is <b style="color:var(--text)">${z2}%</b> of recorded time.</p>
     </div>`;
 }
 
-function renderWeek(week){
-  if (!week || !week.length) return '';
-  const max = Math.max(...week.map(w => w.actual), 1);
-  const todayISO = new Date().toISOString().slice(0,10);
-  const bars = week.map(w => {
-    const h = w.actual ? Math.max(3, Math.round(w.actual / max * 52)) : 3;
-    const col = w.actual ? 'var(--blue)' : 'var(--card-hi)';
-    return `<div class="wb" style="height:${h}px;background:${col}"
-              title="${esc(w.date)} · ${w.actual} TSS"></div>`;
-  }).join('');
-  const labels = week.map(w => {
-    const d = new Date(w.date + 'T00:00:00');
-    return `<span class="${w.date === todayISO ? 'today' : ''}">${
-      d.toLocaleDateString(undefined,{weekday:'narrow'})}</span>`;
-  }).join('');
-  const total = week.reduce((x,w) => x + w.actual, 0);
-  return `<div class="card week-card">
-      <div class="lab">Last 7 days · ${total} TSS</div>
-      <div class="week">${bars}</div>
-      <div class="wdays">${labels}</div>
-    </div>`;
+function secWellness(){
+  const w=(D.wellness||[]).filter(x=>x.weight||x.rhr);
+  if(w.length<3) return '';
+  return `<div class="card"><div class="ch-title">Body</div>
+    <div class="ch-sub">Weight and resting heart rate</div>
+    <div class="chart-wrap"><canvas id="c-well"></canvas></div></div>`;
 }
 
-function renderFtp(a){
-  const bits = [];
-  if (a.ftp)      bits.push(`<div class="item"><span class="k">FTP</span><span class="v amber">${a.ftp} W</span></div>`);
-  if (a.eftp)     bits.push(`<div class="item"><span class="k">eFTP</span><span class="v">${a.eftp} W</span></div>`);
-  if (a.wkg)      bits.push(`<div class="item"><span class="k">W/kg</span><span class="v">${a.wkg}</span></div>`);
-  if (a.weight_kg)bits.push(`<div class="item"><span class="k">Weight</span><span class="v">${a.weight_kg} kg</span></div>`);
-  return bits.length ? `<div class="card ftp">${bits.join('')}</div>` : '';
+function secRecent(){
+  const r=D.recent||[]; if(!r.length) return '';
+  return `<div class="card"><div class="ch-title">Recent activities</div>
+    <div class="ch-sub">Tap a row for the detail</div>
+    <div class="tbl-head"><div>Date</div><div>Activity</div><div class="rt">Time</div>
+      <div class="rt hide">Miles</div><div class="rt hide">Avg W</div>
+      <div class="rt hide">IF</div><div class="rt">TSS</div></div>
+    ${r.slice(0,20).map((a,i)=>`
+      <button class="row" data-i="${i}">
+        <div class="when">${new Date(a.date+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})}</div>
+        <div class="nm"><span class="pip" style="background:${sportCol(a.type)}"></span>
+          <span>${esc(a.name)}</span></div>
+        <div class="n">${esc(hm(a.secs)||'—')}</div>
+        <div class="n hide">${a.meters?mi(a.meters).toFixed(1):'—'}</div>
+        <div class="n hide">${a.watts||'—'}</div>
+        <div class="n dim hide">${a.if??'—'}</div>
+        <div class="n">${a.load??'—'}</div>
+      </button>`).join('')}</div>`;
 }
+
+function secBests(){
+  const b=D.bests||{}; const items=[];
+  const add=(k,a,fmt)=>{ if(a) items.push([k,fmt(a),a.name,a.date]); };
+  add('Longest',b.longest,a=>hm(a.secs));
+  add('Farthest',b.farthest,a=>mi(a.meters).toFixed(1)+' mi');
+  add('Most climbing',b.climbiest,a=>Math.round(ft(a.elev)).toLocaleString()+' ft');
+  add('Hardest',b.hardest,a=>a.load+' TSS');
+  if(!items.length) return '';
+  return `<div class="card"><div class="ch-title">Bests</div>
+    <div class="ch-sub">Across the last 400 days</div>
+    ${items.map(([k,v,n,d])=>`
+      <div style="display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);">
+        <span class="lab" style="width:110px;flex-shrink:0;">${esc(k)}</span>
+        <span class="num" style="font-size:14px;font-weight:600;">${esc(v)}</span>
+        <span style="font-size:12px;color:var(--text-dim);margin-left:auto;text-align:right;">
+          ${esc(n)} · ${new Date(d+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span>
+      </div>`).join('')}</div>`;
+}
+
+/* ------------------------------------------------------------------ charts */
+
+function chart(id, cfg){
+  // A blocked CDN or a bad dataset must never take the rest of the page with it.
+  try{
+    if(typeof Chart === 'undefined'){
+      const el=$(id);
+      if(el && el.parentElement) el.parentElement.innerHTML =
+        `<div class="msg" style="padding:22px 4px;">Chart library didn't load.</div>`;
+      return;
+    }
+    if($(id)) new Chart($(id), cfg);
+  }catch(e){ console.error('chart '+id+' failed:', e); }
+}
+
+function charts(){
+  const f=D.form;
+  if(f && f.series && f.series.length>2 && $('c-form')){
+    chart('c-form', {type:'line', data:{
+      labels:f.series.map(s=>new Date(s.date+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),
+      datasets:[
+        {label:'Fitness (CTL)',data:f.series.map(s=>s.ctl),borderColor:'#5b9bd8',
+         backgroundColor:'rgba(91,155,216,.13)',fill:true,tension:.3,pointRadius:0,borderWidth:2},
+        {label:'Fatigue (ATL)',data:f.series.map(s=>s.atl),borderColor:'#e8686f',
+         fill:false,tension:.3,pointRadius:0,borderWidth:1.5,borderDash:[5,4]}
+      ]}, options:merge({interaction:{mode:'index',intersect:false}})});
+  }
+
+  const w=D.weekly||[];
+  if(w.length && $('c-week')){
+    chart('c-week', {type:'bar', data:{
+      labels:w.map(b=>new Date(b.week+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),
+      datasets:[
+        {label:'Completed',data:w.map(b=>b.actual),backgroundColor:'rgba(91,155,216,.65)',
+         borderColor:'#5b9bd8',borderWidth:1,borderRadius:3},
+        {label:'Planned',data:w.map(b=>b.planned),backgroundColor:'rgba(232,163,61,.30)',
+         borderColor:'rgba(232,163,61,.7)',borderWidth:1,borderRadius:3}
+      ]}, options:merge({})});
+  }
+
+  const m=D.monthly||[];
+  if(m.length && $('c-month')){
+    chart('c-month', {data:{
+      labels:m.map(b=>b.month),
+      datasets:[
+        {type:'bar',label:'Hours',data:m.map(b=>b.hours),backgroundColor:'rgba(111,179,201,.55)',
+         borderColor:'#6fb3c9',borderWidth:1,borderRadius:3,yAxisID:'y'},
+        {type:'line',label:'Miles',data:m.map(b=>b.miles),borderColor:'#4fc78a',
+         tension:.3,pointRadius:3,borderWidth:2,fill:false,yAxisID:'y1'}
+      ]}, options:merge({scales:Object.assign({},CHART_BASE.scales,{
+        y1:{position:'right',grid:{display:false},border:{display:false},
+            ticks:{color:'#4fc78a',font:{family:'IBM Plex Mono',size:9.5}}}
+      })})});
+  }
+
+  const wl=(D.wellness||[]).filter(x=>x.weight||x.rhr);
+  if(wl.length>2 && $('c-well')){
+    chart('c-well', {type:'line', data:{
+      labels:wl.map(x=>new Date(x.date+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),
+      datasets:[
+        {label:'Weight (kg)',data:wl.map(x=>x.weight),borderColor:'#c77dd2',
+         backgroundColor:'rgba(199,125,210,.12)',fill:true,tension:.3,pointRadius:0,borderWidth:2,
+         spanGaps:true,yAxisID:'y'},
+        {label:'Resting HR',data:wl.map(x=>x.rhr),borderColor:'#e8a33d',fill:false,
+         tension:.3,pointRadius:0,borderWidth:1.5,spanGaps:true,yAxisID:'y1'}
+      ]}, options:merge({interaction:{mode:'index',intersect:false},
+        scales:Object.assign({},CHART_BASE.scales,{
+          y1:{position:'right',grid:{display:false},border:{display:false},
+              ticks:{color:'#e8a33d',font:{family:'IBM Plex Mono',size:9.5}}}
+        })})});
+  }
+}
+
+/* ------------------------------------------------------------------ modals */
+
+function openModal(html){ $('mbody').innerHTML=html; $('backdrop').classList.add('open'); }
+$('mclose').onclick=()=>$('backdrop').classList.remove('open');
+$('backdrop').addEventListener('click',e=>{if(e.target.id==='backdrop')e.currentTarget.classList.remove('open');});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('backdrop').classList.remove('open');});
+
+function openActivity(i){
+  const a=(D.recent||[])[i]; if(!a) return;
+  const cell=(k,v)=>v==null||v===''?'':`<div><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`;
+  openModal(`<h2>${esc(a.name)}</h2>
+    <div class="mdate">${new Date(a.date+'T00:00:00').toLocaleDateString(undefined,
+      {weekday:'long',month:'long',day:'numeric'})}${a.start?' · '+esc(a.start):''}</div>
+    <div class="mgrid">
+      ${cell('Distance', a.meters?mi(a.meters).toFixed(1)+' mi':null)}
+      ${cell('Moving time', hm(a.secs))}
+      ${cell('Climbing', a.elev?Math.round(ft(a.elev)).toLocaleString()+' ft':null)}
+      ${cell('Training load', a.load)}
+      ${cell('Avg power', a.watts?a.watts+' W':null)}
+      ${cell('Normalised', a.np?a.np+' W':null)}
+      ${cell('Intensity', a.if)}
+      ${cell('Avg / max HR', a.hr?a.hr+' / '+(a.max_hr||'—'):null)}
+      ${cell('Cadence', a.cadence?a.cadence+' rpm':null)}
+      ${cell('Decoupling', a.decoupling!=null?a.decoupling+' %':null)}
+      ${cell('Efficiency', a.efficiency)}
+      ${cell('Calories', a.cal)}
+    </div>`);
+}
+
+function openDay(iso){
+  const c=(D.calendar||{})[iso]; if(!c) return;
+  const list=(arr,lab,col)=>arr.length?`<div class="lab" style="margin:14px 0 7px;color:${col}">${lab}</div>` +
+    arr.map(x=>`<div style="display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);">
+      <span style="font-size:13.5px;font-weight:500;">${esc(x.name)}</span>
+      <span class="num" style="margin-left:auto;font-size:12px;color:var(--text-dim);">
+        ${[hm(x.secs), x.load?x.load+' TSS':null, x.meters?mi(x.meters).toFixed(1)+' mi':null]
+          .filter(Boolean).join(' · ')}</span></div>`).join(''):'';
+  openModal(`<h2>${new Date(iso+'T00:00:00').toLocaleDateString(undefined,
+      {weekday:'long',month:'long',day:'numeric'})}</h2>
+    <div class="mdate">${c.al?Math.round(c.al)+' TSS completed':'nothing recorded'}${
+      c.pl?' · '+Math.round(c.pl)+' TSS planned':''}</div>
+    ${list(c.a||[],'Completed','var(--green)')}
+    ${list(c.p||[],'Planned','var(--amber)')}`);
+}
+
+/* -------------------------------------------------------------------- load */
 
 function staleness(iso){
-  const age = (Date.now() - new Date(iso)) / 3600000;
-  const dot = $('dot');
-  dot.className = 'dot' + (age < 6 ? ' live' : age < 36 ? ' stale' : ' dead');
-  const rel = age < 1 ? Math.round(age*60) + ' min ago'
-            : age < 36 ? Math.round(age) + ' h ago'
-            : Math.round(age/24) + ' days ago';
-  $('stamp').textContent = 'updated ' + rel;
+  const age=(Date.now()-new Date(iso))/3600000;
+  $('dot').className='dot'+(age<6?' live':age<36?' stale':' dead');
+  $('stamp').textContent='updated '+(age<1?Math.round(age*60)+' min ago'
+    :age<36?Math.round(age)+' h ago':Math.round(age/24)+' days ago');
   return age;
 }
 
 async function load(){
-  let d;
-  try {
-    const r = await fetch('data.json?t=' + Date.now(), {cache:'no-store'});
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    d = await r.json();
-  } catch (err) {
-    $('dot').className = 'dot dead';
-    $('stamp').textContent = 'no data';
-    $('app').innerHTML = `<div class="card"><div class="msg">
-        Couldn't read <code>data.json</code>.<br>
-        Check that the fetch script has run and written it next to this page.
-      </div></div>`;
+  try{
+    const r=await fetch('data.json?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    D=await r.json();
+  }catch(err){
+    $('dot').className='dot dead'; $('stamp').textContent='no data';
+    $('app').innerHTML=`<div class="card"><div class="msg">Couldn't read <code>data.json</code>.<br>
+      Check that the workflow has run.</div></div>`;
     return;
   }
 
-  const age = staleness(d.generated);
-  $('title').textContent = d.athlete?.name ? d.athlete.name.split(' ')[0] + "'s training"
-                                           : 'Training';
-  $('today-date').textContent = new Date().toLocaleDateString(undefined,
-    {weekday:'long', month:'short', day:'numeric'});
+  const age=staleness(D.generated);
+  $('title').textContent=(D.athlete&&D.athlete.name)
+    ? D.athlete.name.split(' ')[0]+"'s training" : 'Training';
+  $('today-date').textContent=new Date().toLocaleDateString(undefined,
+    {weekday:'long',month:'short',day:'numeric'});
+
+  calMonth=new Date(D.today.date+'T00:00:00'); calMonth.setDate(1);
 
   $('app').innerHTML =
-      renderToday(d)
-    + renderCountdown(d.next_benchmark)
-    + renderForm(d.form)
-    + renderWeek(d.week)
-    + renderFtp(d.athlete || {});
+      secToday() + secCountdown() + secStats() + secForm() + secCalendar()
+    + `<div class="grid2">${secWeekly()}${secMonthly()}</div>`
+    + secZones()
+    + `<div class="grid2">${secWellness()}${secBests()}</div>`
+    + secRecent();
 
-  $('foot').textContent = age > 36
-    ? 'Data is stale — is the cron job still running?'
-    : 'intervals.icu';
+  drawCalendar();
+  try{ charts(); }catch(e){ console.error('charts failed:', e); }
+
+  $('cal-prev').onclick=()=>{calMonth.setMonth(calMonth.getMonth()-1);drawCalendar();};
+  $('cal-next').onclick=()=>{calMonth.setMonth(calMonth.getMonth()+1);drawCalendar();};
+  document.querySelectorAll('.row[data-i]').forEach(b=>
+    b.addEventListener('click',()=>openActivity(+b.dataset.i)));
+
+  $('foot').textContent = age>36 ? 'Data is stale — is the workflow still running?' : 'intervals.icu';
 }
 
 load();
-// refresh when the page is brought back to the foreground
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
 </script>
 </body>
 </html>
