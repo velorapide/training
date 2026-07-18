@@ -281,6 +281,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const hm = s => !s ? null : Math.floor(s/3600) + 'h' + String(Math.round(s%3600/60)).padStart(2,'0');
 const mi = m => m ? (m/1609.34) : 0;
+const lb = kg => (kg==null||kg==='') ? null : +(kg*2.20462).toFixed(1);
 const ft = m => m ? (m*3.28084) : 0;
 const ZC = ['#5a6675','#5b9bd8','#4fc78a','#e8a33d','#e8686f','#c77dd2','#8b5cf6'];
 const SPORT = {Ride:'#5b9bd8', VirtualRide:'#6fb3c9', MountainBikeRide:'#4fc78a',
@@ -397,7 +398,7 @@ function secForm(){
     a.ftp?['FTP',a.ftp+' W']:null,
     a.eftp&&a.eftp!==a.ftp?['eFTP',a.eftp+' W']:null,
     a.wkg?['W/kg',a.wkg]:null,
-    a.weight_kg?['Weight',a.weight_kg+' kg']:null,
+    a.weight_kg?['Weight',lb(a.weight_kg)+' lb']:null,
   ].filter(Boolean).map(([k,val])=>
     `<span class="fbadge"><em>${esc(k)}</em>${esc(val)}</span>`).join('');
   return `<div class="card"><div class="fhead">
@@ -748,7 +749,7 @@ function charts(){
     chart('c-well', {type:'line', data:{
       labels:wl.map(x=>new Date(x.date+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),
       datasets:[
-        {label:'Weight (kg)',data:wl.map(x=>x.weight),borderColor:'#c77dd2',
+        {label:'Weight (lb)',data:wl.map(x=>lb(x.weight)),borderColor:'#c77dd2',
          backgroundColor:'rgba(199,125,210,.12)',fill:true,tension:.3,pointRadius:0,borderWidth:2,
          spanGaps:true,yAxisID:'y'},
         {label:'Resting HR',data:wl.map(x=>x.rhr),borderColor:'#e8a33d',fill:false,
