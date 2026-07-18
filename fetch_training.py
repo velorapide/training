@@ -24,7 +24,7 @@ import urllib.request
 BASE = "https://intervals.icu/api/v1"
 TIMEOUT = 45
 
-HISTORY_DAYS = 400          # activities + wellness pulled back this far
+HISTORY_DAYS = 1825         # ~5 years, so the All-time totals are real
 CALENDAR_BACK = 60          # planned events fetched this far back
 CALENDAR_FWD = 45           # ...and this far forward
 
@@ -275,12 +275,16 @@ def build(athlete, key):
     # Deliberately tiny: one short entry per day, not per activity.
     daily = {}
     for a in acts:
-        b = daily.setdefault(a["date"], {"l": 0, "s": 0, "n": 0})
+        b = daily.setdefault(a["date"], {"l": 0, "s": 0, "n": 0, "m": 0, "e": 0})
         b["l"] += a["load"] or 0
         b["s"] += a["secs"] or 0
+        b["m"] += a["meters"] or 0
+        b["e"] += a["elev"] or 0
         b["n"] += 1
     for b in daily.values():
         b["l"] = round(b["l"])
+        b["m"] = round(b["m"])
+        b["e"] = round(b["e"])
 
     # ---- weekly buckets
     def week_start(d):
@@ -354,6 +358,10 @@ def build(athlete, key):
         return max(pool, key=lambda a: a[field]) if pool else None
     bests = {"longest": best("secs"), "farthest": best("meters"),
              "climbiest": best("elev"), "hardest": best("load")}
+    # keep the payload small: bests only need a headline, not the whole activity
+    bests = {k: ({"name": v["name"], "date": v["date"], "secs": v["secs"],
+                  "meters": v["meters"], "elev": v["elev"], "load": v["load"]} if v else None)
+             for k, v in bests.items()}
 
     fields = {
         "activity": sorted(acts_raw[0].keys()) if acts_raw else [],
@@ -379,6 +387,7 @@ def build(athlete, key):
         "upcoming": upcoming[:10],
         "calendar": cal,
         "daily": daily,
+        "earliest": min(daily) if daily else None,
         "weekly": weekly,
         "monthly": monthly,
         "zones_30": zone_totals(30),
