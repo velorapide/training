@@ -56,6 +56,9 @@
   .today .desc{font-size:13.5px;color:var(--text-dim);line-height:1.55;margin:0;
     white-space:pre-wrap;word-break:break-word;}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
+  .nextup{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);}
+  .nextup .nx-name{font-size:17px;font-weight:700;margin-bottom:6px;letter-spacing:-.01em;}
+  .today.rest .nextup .nx-name{color:var(--blue);}
   .chip{font-family:'IBM Plex Mono',monospace;font-size:11px;padding:4px 9px;border-radius:14px;
     border:1px solid var(--line);background:var(--card-hi);color:var(--text-dim);}
   .chip.on{border-color:rgba(79,199,138,.45);color:var(--green);}
@@ -144,6 +147,16 @@ function sparkline(vals){
       <polyline points="${line}"/></svg>`;
 }
 
+function whenLabel(iso){
+  const d = new Date(iso + 'T00:00:00');
+  const days = Math.round((d - new Date(new Date().toDateString())) / 86400000);
+  if (days === 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  return d.toLocaleDateString(undefined, {weekday:'long'}) +
+         (days > 6 ? ', ' + d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '') +
+         ' · ' + days + ' days';
+}
+
 function renderToday(d){
   const p = (d.today.planned || [])[0];
   const done = d.today.completed || [];
@@ -156,7 +169,7 @@ function renderToday(d){
     if (p.load) chips.push(p.load + ' TSS');
     done.forEach(a => chips.push(`<span class="chip on">done · ${esc(hm(a.duration_s) || '')}</span>`));
     body = `<h2>${esc(p.name)}</h2>` +
-      (p.description ? `<p class="desc">${esc(p.description)}</p>` : '') +
+      (p.description ? `<p class="desc">${esc(p.description.trim())}</p>` : '') +
       `<div class="chips">` +
         chips.map(c => c.startsWith('<') ? c : `<span class="chip">${esc(c)}</span>`).join('') +
       `</div>`;
@@ -168,8 +181,26 @@ function renderToday(d){
       <div class="chips"><span class="chip on">${esc(hm(done[0].duration_s) || '')}</span>` +
       (doneLoad ? `<span class="chip">${doneLoad} TSS</span>` : '') + `</div>`;
   } else {
+    // Nothing today. The useful fact is what's next, not that today is blank.
+    const nxt = (d.upcoming || []).find(u => u.date > d.today.date);
     cls += ' rest';
-    body = `<h2>Rest day</h2><p class="desc">Nothing on the calendar. Stay off the legs.</p>`;
+    if (nxt) {
+      lab = 'Today · rest';
+      const chips = [];
+      if (nxt.duration_s) chips.push(hm(nxt.duration_s));
+      if (nxt.load) chips.push(nxt.load + ' TSS');
+      body = `<h2>Rest day</h2>
+        <div class="nextup">
+          <div class="lab" style="margin-bottom:6px;">Next · ${esc(whenLabel(nxt.date))}</div>
+          <div class="nx-name">${esc(nxt.name)}</div>` +
+          (nxt.description ? `<p class="desc">${esc(nxt.description.trim())}</p>` : '') +
+          `<div class="chips">` +
+            chips.map(c => `<span class="chip">${esc(c)}</span>`).join('') +
+          `</div>
+        </div>`;
+    } else {
+      body = `<h2>Rest day</h2><p class="desc">Nothing on the calendar. Stay off the legs.</p>`;
+    }
   }
   return `<div class="card ${cls}"><div class="lab">${lab}</div>${body}</div>`;
 }
