@@ -28,6 +28,16 @@ jobs:
         with:
           python-version: "3.12"
 
+      # GPS traces and power peaks are expensive to fetch, so keep them between
+      # runs. Each ride is then only ever pulled from the API once.
+      - name: Restore stream cache
+        uses: actions/cache@v4
+        with:
+          path: .cache
+          key: streams-${{ github.run_id }}
+          restore-keys: |
+            streams-
+
       - name: Assemble the site
         run: |
           mkdir -p _site
