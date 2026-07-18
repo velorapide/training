@@ -271,6 +271,17 @@ def build(athlete, key):
                        "type": a["type"], "meters": a["meters"]})
         c["al"] += a["load"] or 0
 
+    # ---- daily load across the whole history window, for the year view.
+    # Deliberately tiny: one short entry per day, not per activity.
+    daily = {}
+    for a in acts:
+        b = daily.setdefault(a["date"], {"l": 0, "s": 0, "n": 0})
+        b["l"] += a["load"] or 0
+        b["s"] += a["secs"] or 0
+        b["n"] += 1
+    for b in daily.values():
+        b["l"] = round(b["l"])
+
     # ---- weekly buckets
     def week_start(d):
         return d - dt.timedelta(days=d.weekday())
@@ -367,6 +378,7 @@ def build(athlete, key):
         "next_benchmark": next_benchmark,
         "upcoming": upcoming[:10],
         "calendar": cal,
+        "daily": daily,
         "weekly": weekly,
         "monthly": monthly,
         "zones_30": zone_totals(30),

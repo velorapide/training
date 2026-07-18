@@ -108,18 +108,27 @@
   .chart-wrap.tall{height:230px;}
 
   /* calendar */
-  .cal-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-  .cal-head .m{font-size:13px;font-weight:600;margin-left:auto;font-family:'IBM Plex Mono',monospace;}
+  .cal-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  .seg{display:flex;background:transparent;border:1px solid var(--line);border-radius:7px;
+    padding:2px;margin-left:auto;}
+  .seg button{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.03em;
+    text-transform:uppercase;background:none;border:none;color:var(--text-dim);
+    padding:5px 11px;border-radius:5px;cursor:pointer;}
+  .seg button.active{background:var(--card-hi);color:var(--text);font-weight:600;}
+  .cal-bar{display:flex;align-items:center;gap:10px;margin-bottom:13px;}
   .cal-nav{display:flex;gap:3px;}
-  .cal-nav button{width:24px;height:24px;border-radius:6px;background:none;border:1px solid var(--line);
-    color:var(--text-dim);cursor:pointer;line-height:1;}
+  .cal-nav button{height:25px;min-width:25px;padding:0 8px;border-radius:6px;background:none;
+    border:1px solid var(--line);color:var(--text-dim);cursor:pointer;line-height:1;
+    font-family:'IBM Plex Mono',monospace;font-size:11px;}
   .cal-nav button:hover{background:var(--card-hi);color:var(--text);}
+  .cal-label{font-size:12.5px;font-weight:600;color:var(--text);}
+
   .cal-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px;}
   .cal-dow span{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text-dim);
     text-align:center;text-transform:uppercase;letter-spacing:.06em;}
   .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
   .cell{aspect-ratio:1;border-radius:6px;background:rgba(255,255,255,.025);border:1px solid transparent;
-    padding:4px 5px;display:flex;flex-direction:column;gap:2px;min-width:0;cursor:default;position:relative;}
+    padding:4px 5px;display:flex;flex-direction:column;gap:2px;min-width:0;position:relative;}
   .cell.out{opacity:.28;}
   .cell.today{border-color:var(--amber);}
   .cell .dnum{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--text-dim);line-height:1;}
@@ -134,6 +143,55 @@
     letter-spacing:.04em;color:var(--text-dim);}
   .cal-key span{display:flex;align-items:center;gap:6px;}
   .cal-key i{width:10px;height:10px;border-radius:2px;}
+
+  /* day view */
+  .daytot{display:flex;gap:20px;font-size:12.5px;color:var(--text-dim);
+    padding-bottom:11px;border-bottom:1px solid var(--line);}
+  .daytot b{color:var(--text);font-size:15px;}
+  .dayrow{display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);}
+  .dayrow .nm{font-size:14px;font-weight:500;}
+  .dayrow .meta{margin-left:auto;font-size:11.5px;color:var(--text-dim);text-align:right;}
+
+  /* week view */
+  .wgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .wcol{background:rgba(255,255,255,.025);border:1px solid transparent;border-radius:8px;
+    padding:8px 7px;min-width:0;display:flex;flex-direction:column;gap:6px;}
+  .wcol.today{border-color:var(--amber);}
+  .wday{font-family:'IBM Plex Mono',monospace;font-size:9.5px;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--text-dim);line-height:1.3;}
+  .wday b{display:block;font-size:15px;color:var(--text);font-weight:600;}
+  .wcol.today .wday b{color:var(--amber);}
+  .wbar{background:var(--blue);border-radius:3px;min-height:3px;width:100%;}
+  .witems{display:flex;flex-direction:column;gap:5px;}
+  .witem{border-radius:5px;padding:5px 6px;font-size:11px;line-height:1.35;min-width:0;}
+  .witem.done{background:rgba(91,155,216,.16);border-left:2px solid var(--blue);}
+  .witem.plan{background:rgba(232,163,61,.10);border-left:2px solid rgba(232,163,61,.6);}
+  .witem span{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .witem em{display:block;font-style:normal;font-size:9.5px;color:var(--text-dim);margin-top:2px;}
+  .wempty{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);opacity:.5;}
+  .wtot{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:13px;padding-top:11px;
+    border-top:1px solid var(--line);font-size:12px;color:var(--text-dim);}
+  .wtot b{color:var(--text);font-size:14px;}
+  .wtot .dim b{color:var(--text-dim);}
+  @media(max-width:760px){
+    .wgrid{grid-template-columns:1fr;gap:5px;}
+    .wcol{flex-direction:row;align-items:center;gap:10px;}
+    .wday{width:52px;flex-shrink:0;}
+    .wday b{display:inline;margin-left:5px;}
+    .wbar{display:none;}
+    .witems{flex:1;min-width:0;}
+  }
+
+  /* year heatmap */
+  .yscroll{overflow-x:auto;padding-bottom:4px;}
+  .ywrap{min-width:740px;}
+  .ymons{display:flex;gap:3px;margin-bottom:4px;}
+  .ymon{width:12px;flex:1 0 12px;font-family:'IBM Plex Mono',monospace;font-size:9px;
+    color:var(--text-dim);white-space:nowrap;}
+  .ygrid{display:flex;gap:3px;}
+  .ycol{display:flex;flex-direction:column;gap:3px;flex:1 0 12px;}
+  .ycell{aspect-ratio:1;border-radius:2px;border:1px solid transparent;}
+  .ycell.today{border-color:var(--amber);}
 
   /* zones */
   .tz-bar{display:flex;height:28px;border-radius:5px;overflow:hidden;background:rgba(255,255,255,.04);margin-top:10px;}
@@ -221,7 +279,7 @@ const ZC = ['#5a6675','#5b9bd8','#4fc78a','#e8a33d','#e8686f','#c77dd2','#8b5cf6
 const SPORT = {Ride:'#5b9bd8', VirtualRide:'#6fb3c9', MountainBikeRide:'#4fc78a',
                Run:'#e8a33d', Walk:'#c77dd2', Hike:'#c77dd2', Swim:'#6fb3c9'};
 const sportCol = t => SPORT[t] || '#5b9bd8';
-let D = null, calMonth = null;
+let D = null, calAnchor = null, calView = 'week';
 
 const CHART_BASE = {
   responsive:true, maintainAspectRatio:false,
@@ -330,53 +388,201 @@ function secForm(){
 
 function secCalendar(){
   return `<div class="card">
-    <div class="cal-head"><div><div class="ch-title" style="margin:0">Calendar</div>
-      <div class="ch-sub" style="margin:0">Planned against completed</div></div>
-      <span class="m" id="cal-month"></span>
-      <div class="cal-nav"><button id="cal-prev" aria-label="Previous month">‹</button>
-        <button id="cal-next" aria-label="Next month">›</button></div></div>
-    <div class="cal-dow">${['M','T','W','T','F','S','S'].map(d=>`<span>${d}</span>`).join('')}</div>
-    <div class="cal" id="cal"></div>
-    <div class="cal-key">
-      <span><i style="background:var(--blue)"></i>Completed</span>
-      <span><i style="background:rgba(232,163,61,.55)"></i>Planned</span>
-      <span>Bar length = training load</span></div></div>`;
+    <div class="cal-head">
+      <div><div class="ch-title" style="margin:0">Calendar</div>
+        <div class="ch-sub" style="margin:0">Planned against completed</div></div>
+      <div class="seg" id="cal-seg">
+        ${['day','week','month','year'].map(v=>
+          `<button data-v="${v}"${v===calView?' class="active"':''}>${v}</button>`).join('')}
+      </div>
+    </div>
+    <div class="cal-bar">
+      <div class="cal-nav">
+        <button id="cal-prev" aria-label="Previous">‹</button>
+        <button id="cal-today">Today</button>
+        <button id="cal-next" aria-label="Next">›</button>
+      </div>
+      <span class="cal-label num" id="cal-label"></span>
+    </div>
+    <div id="cal-body"></div>
+  </div>`;
 }
 
-function drawCalendar(){
-  const el=$('cal'); if(!el) return;
-  const first=new Date(calMonth.getFullYear(), calMonth.getMonth(), 1);
-  const lead=(first.getDay()+6)%7;
-  const start=new Date(first); start.setDate(1-lead);
-  const todayISO=D.today.date;
-  const cal=D.calendar||{};
-  const loads=Object.values(cal).flatMap(c=>[c.al||0,c.pl||0]);
-  const max=Math.max(...loads,60);
-  $('cal-month').textContent=calMonth.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+/* ---- shared helpers ---- */
+const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const mondayOf = d => { const x=new Date(d); x.setDate(x.getDate()-((x.getDay()+6)%7)); x.setHours(0,0,0,0); return x; };
+const dayData = i => (D.calendar||{})[i];
+const dayLoad = i => {
+  const c=(D.calendar||{})[i];
+  if(c && (c.al||c.pl!==undefined)) return c.al||0;
+  const dl=(D.daily||{})[i];
+  return dl? dl.l : 0;
+};
 
-  let html='';
-  for(let i=0;i<42;i++){
-    const d=new Date(start); d.setDate(start.getDate()+i);
-    const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    const c=cal[iso];
-    const out=d.getMonth()!==calMonth.getMonth();
-    const cls='cell'+(out?' out':'')+(iso===todayISO?' today':'');
+function loadColour(load, max){
+  if(!load) return 'rgba(255,255,255,.04)';
+  const t=Math.min(1, load/(max||100));
+  return `rgba(91,155,216,${(0.18+0.72*t).toFixed(2)})`;
+}
+
+/* ---- the four views ---- */
+
+function viewDay(){
+  const i=iso(calAnchor), c=dayData(i);
+  const planned=(c&&c.p)||[], actual=(c&&c.a)||[];
+  const block=(arr,title,col)=> arr.length? `
+    <div class="lab" style="margin:16px 0 8px;color:${col}">${title}</div>` +
+    arr.map(x=>`<div class="dayrow">
+      <span class="nm">${esc(x.name)}</span>
+      <span class="num meta">${[hm(x.secs), x.load?x.load+' TSS':null,
+        x.meters?mi(x.meters).toFixed(1)+' mi':null].filter(Boolean).join(' · ')||'—'}</span>
+    </div>`).join('') : '';
+  if(!planned.length && !actual.length)
+    return `<div class="msg">Nothing planned or recorded on this day.</div>`;
+  return `<div class="daytot">
+      <span><b class="num">${Math.round((c&&c.al)||0)}</b> TSS completed</span>
+      ${c&&c.pl?`<span><b class="num">${Math.round(c.pl)}</b> TSS planned</span>`:''}
+    </div>` + block(actual,'Completed','var(--green)') + block(planned,'Planned','var(--amber)');
+}
+
+function viewWeek(){
+  const start=mondayOf(calAnchor);
+  const days=[...Array(7)].map((_,k)=>{ const d=new Date(start); d.setDate(start.getDate()+k); return d; });
+  const loads=days.map(d=>{const c=dayData(iso(d));return Math.max((c&&c.al)||0,(c&&c.pl)||0);});
+  const max=Math.max(...loads,60);
+  let totA=0, totP=0, totS=0;
+  const cols=days.map(d=>{
+    const i=iso(d), c=dayData(i);
+    const a=(c&&c.a)||[], p=(c&&c.p)||[];
+    totA+=(c&&c.al)||0; totP+=(c&&c.pl)||0;
+    a.forEach(x=>totS+=x.secs||0);
+    const isToday=i===D.today.date;
+    return `<div class="wcol${isToday?' today':''}" data-d="${i}">
+      <div class="wday">${d.toLocaleDateString(undefined,{weekday:'short'})}
+        <b>${d.getDate()}</b></div>
+      <div class="wbar" style="height:${Math.round(Math.max((c&&c.al)||0,0)/max*46)}px"></div>
+      <div class="witems">
+        ${a.map(x=>`<div class="witem done"><span>${esc(x.name)}</span>
+           <em class="num">${[hm(x.secs),x.load?x.load+' TSS':null].filter(Boolean).join(' · ')}</em></div>`).join('')}
+        ${p.filter(()=>!a.length).map(x=>`<div class="witem plan"><span>${esc(x.name)}</span>
+           <em class="num">${[hm(x.secs),x.load?x.load+' TSS':null].filter(Boolean).join(' · ')}</em></div>`).join('')}
+        ${!a.length&&!p.length?`<div class="wempty">—</div>`:''}
+      </div></div>`;
+  }).join('');
+  return `<div class="wgrid">${cols}</div>
+    <div class="wtot">
+      <span><b class="num">${Math.round(totA)}</b> TSS</span>
+      <span><b class="num">${hm(totS)||'0h00'}</b></span>
+      ${totP?`<span class="dim"><b class="num">${Math.round(totP)}</b> TSS planned</span>`:''}
+    </div>`;
+}
+
+function viewMonth(){
+  const first=new Date(calAnchor.getFullYear(), calAnchor.getMonth(), 1);
+  const start=mondayOf(first);
+  const cal=D.calendar||{};
+  const max=Math.max(...Object.values(cal).flatMap(c=>[c.al||0,c.pl||0]),60);
+  let cells='';
+  for(let k=0;k<42;k++){
+    const d=new Date(start); d.setDate(start.getDate()+k);
+    const i=iso(d), c=cal[i];
+    const out=d.getMonth()!==calAnchor.getMonth();
     let bars='';
     if(c){
       if(c.al) bars+=`<div class="bar a" style="width:${Math.max(12,Math.min(100,c.al/max*100))}%"></div>`;
       if(c.pl && !c.al) bars+=`<div class="bar p" style="width:${Math.max(12,Math.min(100,c.pl/max*100))}%"></div>`;
     }
-    const load=c&&c.al?`<div class="ld">${Math.round(c.al)}</div>`:'';
-    html+=`<div class="${cls}" data-d="${iso}" title="${esc(iso)}">
-      <div class="dnum">${d.getDate()}</div>${load}<div class="bars">${bars}</div></div>`;
+    cells+=`<div class="cell${out?' out':''}${i===D.today.date?' today':''}" data-d="${i}">
+      <div class="dnum">${d.getDate()}</div>
+      ${c&&c.al?`<div class="ld">${Math.round(c.al)}</div>`:''}
+      <div class="bars">${bars}</div></div>`;
   }
-  el.innerHTML=html;
-  el.querySelectorAll('.cell').forEach(cell=>{
-    const c=cal[cell.dataset.d];
-    if(!c) return;
-    cell.style.cursor='pointer';
-    cell.addEventListener('click',()=>openDay(cell.dataset.d));
+  return `<div class="cal-dow">${['M','T','W','T','F','S','S'].map(x=>`<span>${x}</span>`).join('')}</div>
+    <div class="cal">${cells}</div>`;
+}
+
+function viewYear(){
+  const y=calAnchor.getFullYear();
+  const first=mondayOf(new Date(y,0,1));
+  const last=new Date(y,11,31);
+  const daily=D.daily||{};
+  const vals=Object.keys(daily).filter(k=>k.startsWith(y)).map(k=>daily[k].l);
+  const max=Math.max(...vals,60);
+  let weeks='', months='', prevMonth=-1, wk=0, total=0, count=0, secs=0;
+  const cur=new Date(first);
+  while(cur<=last || cur.getDay()!==1){
+    let col='';
+    let labelled=false;
+    for(let r=0;r<7;r++){
+      const d=new Date(cur); d.setDate(cur.getDate()+r);
+      const i=iso(d);
+      const inYear=d.getFullYear()===y;
+      const l=inYear?dayLoad(i):0;
+      if(inYear && daily[i]){ total+=daily[i].l; count+=daily[i].n; secs+=daily[i].s; }
+      if(r===0 && inYear && d.getMonth()!==prevMonth && d.getDate()<=7){
+        prevMonth=d.getMonth(); labelled=true;
+      }
+      col+=`<div class="ycell${i===D.today.date?' today':''}" data-d="${i}"
+        style="background:${inYear?loadColour(l,max):'transparent'}"
+        title="${i}${l?' · '+l+' TSS':''}"></div>`;
+    }
+    months+=`<span class="ymon">${labelled?new Date(cur).toLocaleDateString(undefined,{month:'short'}):''}</span>`;
+    weeks+=`<div class="ycol">${col}</div>`;
+    cur.setDate(cur.getDate()+7); wk++;
+    if(wk>54) break;
+  }
+  return `<div class="yscroll"><div class="ywrap">
+      <div class="ymons">${months}</div>
+      <div class="ygrid">${weeks}</div>
+    </div></div>
+    <div class="wtot">
+      <span><b class="num">${count}</b> activities</span>
+      <span><b class="num">${Math.round(secs/3600)}</b> h</span>
+      <span><b class="num">${Math.round(total).toLocaleString()}</b> TSS</span>
+    </div>
+    <div class="cal-key"><span>Darker = bigger day</span><span>Tap a square for the detail</span></div>`;
+}
+
+function drawCalendar(){
+  const body=$('cal-body'); if(!body) return;
+  const L=$('cal-label');
+  if(calView==='day'){
+    body.innerHTML=viewDay();
+    L.textContent=calAnchor.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+  } else if(calView==='week'){
+    body.innerHTML=viewWeek();
+    const s=mondayOf(calAnchor), e=new Date(s); e.setDate(s.getDate()+6);
+    L.textContent=s.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' – '+
+                  e.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  } else if(calView==='month'){
+    body.innerHTML=viewMonth();
+    L.textContent=calAnchor.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  } else {
+    body.innerHTML=viewYear();
+    L.textContent=calAnchor.getFullYear();
+  }
+  body.querySelectorAll('[data-d]').forEach(el=>{
+    const i=el.dataset.d;
+    if(calView==='year' || calView==='week'){
+      el.style.cursor='pointer';
+      el.addEventListener('click',()=>{ calAnchor=new Date(i+'T00:00:00'); calView='day';
+        document.querySelectorAll('#cal-seg button').forEach(b=>
+          b.classList.toggle('active', b.dataset.v==='day'));
+        drawCalendar(); });
+    } else if(dayData(i)){
+      el.style.cursor='pointer';
+      el.addEventListener('click',()=>openDay(i));
+    }
   });
+}
+
+function calStep(dir){
+  const d=new Date(calAnchor);
+  if(calView==='day')   d.setDate(d.getDate()+dir);
+  if(calView==='week')  d.setDate(d.getDate()+7*dir);
+  if(calView==='month') d.setMonth(d.getMonth()+dir);
+  if(calView==='year')  d.setFullYear(d.getFullYear()+dir);
+  calAnchor=d; drawCalendar();
 }
 
 function secWeekly(){
@@ -601,7 +807,7 @@ async function load(){
   $('today-date').textContent=new Date().toLocaleDateString(undefined,
     {weekday:'long',month:'short',day:'numeric'});
 
-  calMonth=new Date(D.today.date+'T00:00:00'); calMonth.setDate(1);
+  calAnchor=new Date(D.today.date+'T00:00:00');
 
   const cd = secCountdown();
   $('app').innerHTML =
@@ -615,8 +821,14 @@ async function load(){
   drawCalendar();
   try{ charts(); }catch(e){ console.error('charts failed:', e); }
 
-  $('cal-prev').onclick=()=>{calMonth.setMonth(calMonth.getMonth()-1);drawCalendar();};
-  $('cal-next').onclick=()=>{calMonth.setMonth(calMonth.getMonth()+1);drawCalendar();};
+  $('cal-prev').onclick=()=>calStep(-1);
+  $('cal-next').onclick=()=>calStep(1);
+  $('cal-today').onclick=()=>{calAnchor=new Date(D.today.date+'T00:00:00');drawCalendar();};
+  $('cal-seg').addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    document.querySelectorAll('#cal-seg button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); calView=b.dataset.v; drawCalendar();
+  });
   document.querySelectorAll('.row[data-i]').forEach(b=>
     b.addEventListener('click',()=>openActivity(+b.dataset.i)));
 
