@@ -1,0 +1,75 @@
+name: Update training dashboard
+
+"on":
+  schedule:
+    - cron: "17 */2 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/New_York
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          if [ -f CNAME ]; then cp CNAME _site/; fi
+
+      - name: Fetch intervals.icu data
+        env:
+          INTERVALS_ATHLETE_ID: ${{ secrets.INTERVALS_ATHLETE_ID }}
+          INTERVALS_API_KEY: ${{ secrets.INTERVALS_API_KEY }}
+        run: python fetch_training.py _site/data.json
+
+      - name: Sanity check the output
+        run: |
+          python - <<'PY'
+          import json, sys
+          d = json.load(open("_site/data.json"))
+          if not d.get("generated"):
+              sys.exit("data.json has no timestamp - the fetch failed silently")
+          a = d.get("athlete") or {}
+          f = d.get("form") or {}
+          print("generated:", d["generated"])
+          print("ftp:", a.get("ftp"), "| eftp:", a.get("eftp"), "| weight:", a.get("weight_kg"))
+          print("ctl:", f.get("ctl"), "| atl:", f.get("atl"))
+          print("planned today:", len((d.get("today") or {}).get("planned", [])))
+          print("recent activities:", len(d.get("recent", [])))
+          if not d.get("recent"):
+              print("::warning::No activities came back - check field names with --dump")
+          PY
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
