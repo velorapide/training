@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"
+     role="img" aria-label="Training">
+  <rect width="512" height="512" rx="96" fill="#0d131c"/>
+  <!-- fewer, thicker bars so the mark survives at 16 px -->
+  <rect x="66"  y="278" width="112" height="152" rx="26" fill="#5b9bd8"/>
+  <rect x="200" y="204" width="112" height="226" rx="26" fill="#5b9bd8"/>
+  <rect x="334" y="106" width="112" height="324" rx="26" fill="#e8a33d"/>
+</svg>
