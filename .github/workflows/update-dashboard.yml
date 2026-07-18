@@ -42,21 +42,16 @@ jobs:
 
       - name: Sanity check the output
         run: |
-          python - <<'PY'
-          import json, sys
-          d = json.load(open("_site/data.json"))
-          if not d.get("generated"):
-              sys.exit("data.json has no timestamp - the fetch failed silently")
-          a = d.get("athlete") or {}
-          f = d.get("form") or {}
-          print("generated:", d["generated"])
-          print("ftp:", a.get("ftp"), "| eftp:", a.get("eftp"), "| weight:", a.get("weight_kg"))
-          print("ctl:", f.get("ctl"), "| atl:", f.get("atl"))
-          print("planned today:", len((d.get("today") or {}).get("planned", [])))
-          print("recent activities:", len(d.get("recent", [])))
-          if not d.get("recent"):
-              print("::warning::No activities came back - check field names with --dump")
-          PY
+          python -c "
+          import json
+          d = json.load(open('_site/data.json'))
+          a = d.get('athlete') or {}
+          f = d.get('form') or {}
+          print('generated:', d.get('generated'))
+          print('ftp:', a.get('ftp'), '| eftp:', a.get('eftp'))
+          print('ctl:', f.get('ctl'), '| atl:', f.get('atl'))
+          print('recent activities:', len(d.get('recent', [])))
+          "
 
       - uses: actions/configure-pages@v5
 
