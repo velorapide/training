@@ -50,6 +50,17 @@ def load_config():
     return str(athlete), str(key)
 
 
+# Cloudflare sits in front of intervals.icu and rejects the default
+# "Python-urllib/3.x" user agent with a 1010 "access denied". Any ordinary
+# browser UA gets through.
+USER_AGENTS = [
+    ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
+    ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+     "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"),
+]
+
+
 def get(path, athlete, key, **params):
     """GET an intervals.icu endpoint, return decoded JSON (or [] on 404)."""
     url = f"{BASE}/athlete/{athlete}{path}"
@@ -57,20 +68,34 @@ def get(path, athlete, key, **params):
         qs = "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())
         url = f"{url}?{qs}"
     token = base64.b64encode(f"API_KEY:{key}".encode()).decode()
-    req = urllib.request.Request(url, headers={
-        "Authorization": f"Basic {token}",
-        "Accept": "application/json",
-    })
-    try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-            return json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return []
-        body = e.read().decode()[:300]
-        sys.exit(f"HTTP {e.code} on {path}\n{body}")
-    except urllib.error.URLError as e:
-        sys.exit(f"Could not reach intervals.icu: {e.reason}")
+
+    last = None
+    for ua in USER_AGENTS:
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"Basic {token}",
+            "Accept": "application/json",
+            "User-Agent": ua,
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "identity",
+        })
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+                return json.loads(r.read().decode())
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return []
+            body = e.read().decode()[:400]
+            if e.code == 403 and "1010" in body:
+                last = f"Cloudflare blocked the request (error 1010) on {path}"
+                continue          # try the next user agent
+            if e.code == 401:
+                sys.exit("HTTP 401 - intervals.icu rejected the credentials. "
+                         "Check INTERVALS_ATHLETE_ID and INTERVALS_API_KEY.")
+            sys.exit(f"HTTP {e.code} on {path}\n{body}")
+        except urllib.error.URLError as e:
+            sys.exit(f"Could not reach intervals.icu: {e.reason}")
+
+    sys.exit(f"{last}\nEvery user agent was refused. See the README for the curl fallback.")
 
 
 # --------------------------------------------------------------------------- helpers
