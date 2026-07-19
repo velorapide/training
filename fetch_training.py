@@ -676,14 +676,10 @@ def build(athlete, key):
         print("stream fetch skipped:", e)
         newly = 0
 
-    routes, peaks_by_act = [], {}
+    peaks_by_act = {}
     for a in acts:
         c = cache.get(str(a["id"]))
-        if not isinstance(c, dict):
-            continue
-        if c.get("r"):
-            routes.append({"d": a["date"], "p": c["r"]})
-        if c.get("p"):
+        if isinstance(c, dict) and c.get("p"):
             peaks_by_act[a["date"]] = c["p"]
 
     def peak_window(days_back):
@@ -761,7 +757,6 @@ def build(athlete, key):
         "bests": bests,
         "wellness": wl[-120:],
         "recent": acts[:40],
-        "routes": routes[:150],
         "power_curve": power_curve,
         "peak_durations": PEAK_DURATIONS,
         "gear": gear,
