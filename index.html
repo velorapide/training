@@ -15,6 +15,8 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -111,8 +113,22 @@
     display:flex;align-items:baseline;gap:6px;}
   .fbadge em{font-style:normal;font-size:9px;letter-spacing:.07em;text-transform:uppercase;
     color:var(--text-dim);font-weight:400;}
-  .mapwrap{background:rgba(255,255,255,.02);border-radius:9px;padding:6px;margin-top:6px;}
-  .rmap{width:100%;height:auto;display:block;}
+  .rhead{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  .rhead .seg{margin-left:auto;}
+  .lmap{height:520px;border-radius:9px;overflow:hidden;background:#0b1017;}
+  @media(max-width:700px){.lmap{height:380px;}}
+  .rmap{width:100%;height:100%;display:block;}
+  .leaflet-container{background:#0b1017;font-family:'Inter',sans-serif;}
+  .leaflet-control-attribution{background:rgba(13,19,28,.75)!important;color:#8993a3!important;
+    font-size:9.5px!important;}
+  .leaflet-control-attribution a{color:#6fb3c9!important;}
+  .leaflet-bar a{background:#141c28!important;color:#e7ebf1!important;
+    border-color:rgba(255,255,255,.12)!important;}
+  .leaflet-bar a:hover{background:#1a2432!important;}
+  .leaflet-tooltip{background:#141c28!important;border:1px solid rgba(255,255,255,.15)!important;
+    color:#e7ebf1!important;font-family:'IBM Plex Mono',monospace!important;font-size:11px!important;
+    box-shadow:0 4px 16px rgba(0,0,0,.4)!important;}
+  .leaflet-tooltip:before{border-top-color:rgba(255,255,255,.15)!important;}
 
   .dowgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end;}
   .dowcol{display:flex;flex-direction:column;align-items:center;gap:5px;}
@@ -225,8 +241,9 @@
   .tz-seg{display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;
     font-size:9.5px;color:rgba(13,19,28,.85);font-weight:600;min-width:0;}
   .tz-key{display:flex;flex-wrap:wrap;gap:7px 15px;margin-top:12px;
-    font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;
+    font-family:'IBM Plex Mono',monospace;font-size:10px;
     letter-spacing:.04em;color:var(--text-dim);}
+  .tz-key b{color:var(--text);font-weight:600;}
   .tz-key span{display:flex;align-items:center;gap:6px;}
   .tz-key i{width:10px;height:10px;border-radius:2px;}
 
@@ -654,10 +671,12 @@ function secZones(){
       title="${names[i]} · ${Math.round(s/60)} min">${p>=8?Math.round(p)+'%':''}</div>`;
   }).join('');
   const z2=Math.round(z[1]/total*100);
+  const dur=sec=>{const h=Math.floor(sec/3600),m=Math.round(sec%3600/60);
+    return h?h+'h'+String(m).padStart(2,'0'):m+' min';};
   return `<div class="card"><div class="ch-title">Time in zone</div>
-    <div class="ch-sub">Last 30 days · ${Math.round(total/3600)} h recorded with power</div>
+    <div class="ch-sub">Last 30 days · ${dur(total)} recorded with power</div>
     <div class="tz-bar">${segs}</div>
-    <div class="tz-key">${z.map((s,i)=>s?`<span><i style="background:${ZC[i]}"></i>${names[i]} ${Math.round(s/60)}m</span>`:'').join('')}</div>
+    <div class="tz-key">${z.map((s,i)=>s?`<span><i style="background:${ZC[i]}"></i>${names[i]} <b>${dur(s)}</b></span>`:'').join('')}</div>
     <p class="desc" style="margin-top:13px;">Zone 2 is <b style="color:var(--text)">${z2}%</b> of recorded time.</p>
     </div>`;
 }
@@ -715,29 +734,97 @@ function secBests(){
 function secRoutes(){
   const R=(D.routes||[]).filter(r=>r.p&&r.p.length>1);
   if(!R.length) return '';
+  return `<div class="card"><div class="rhead">
+      <div><div class="ch-title" style="margin:0">Where you ride</div>
+      <div class="ch-sub" style="margin:0">${R.length} rides · the amber trace is the most recent</div></div>
+      <div class="seg" id="map-seg">
+        <button data-m="local" class="active">Home</button>
+        <button data-m="all">Everything</button>
+      </div></div>
+    <div id="rmap" class="lmap"></div></div>`;
+}
+
+/* Routes far from the usual roads (a trip, a race away) stretch the view and
+   shrink everything else, so "Home" fits to the main cluster instead. */
+function routeBounds(routes){
+  let a=90,b=-90,c=180,d=-180;
+  routes.forEach(r=>r.p.forEach(([la,lo])=>{
+    if(la<a)a=la; if(la>b)b=la; if(lo<c)c=lo; if(lo>d)d=lo;}));
+  return [[a,c],[b,d]];
+}
+
+function localRoutes(R){
+  const mid=r=>r.p[Math.floor(r.p.length/2)];
+  const las=R.map(r=>mid(r)[0]).sort((x,y)=>x-y);
+  const los=R.map(r=>mid(r)[1]).sort((x,y)=>x-y);
+  const mla=las[Math.floor(las.length/2)], mlo=los[Math.floor(los.length/2)];
+  // keep rides whose midpoint sits within ~55 km of the median midpoint
+  const near=R.filter(r=>{
+    const [la,lo]=mid(r);
+    return Math.abs(la-mla)<0.5 && Math.abs(lo-mlo)<0.5;
+  });
+  return near.length?near:R;
+}
+
+let mapObj=null, mapLayers=[], mapMode='local';
+
+function drawMap(){
+  const host=$('rmap'); if(!host) return;
+  const R=(D.routes||[]).filter(r=>r.p&&r.p.length>1);
+  if(!R.length) return;
+  const shown = mapMode==='local' ? localRoutes(R) : R;
+  const newest = R.reduce((a,b)=>a.d>b.d?a:b).d;
+
+  if(typeof L === 'undefined'){ drawMapSVG(host, shown, newest); return; }
+
+  if(!mapObj){
+    mapObj = L.map(host, {
+      zoomControl:true, attributionControl:true,
+      scrollWheelZoom:false,          // so the page still scrolls over the map
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+      attribution:'&copy; OpenStreetMap &copy; CARTO',
+      subdomains:'abcd', maxZoom:19
+    }).addTo(mapObj);
+    mapObj.on('click',()=>mapObj.scrollWheelZoom.enable());
+    mapObj.on('mouseout',()=>mapObj.scrollWheelZoom.disable());
+  }
+  mapLayers.forEach(l=>mapObj.removeLayer(l)); mapLayers=[];
+  shown.forEach(r=>{
+    const recent=r.d===newest;
+    const line=L.polyline(r.p,{
+      color: recent?'#e8a33d':'#5b9bd8',
+      weight: recent?3:1.5,
+      opacity: recent?0.95:0.38,
+      smoothFactor:1.2
+    }).addTo(mapObj);
+    line.bindTooltip(new Date(r.d+'T00:00:00')
+      .toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}));
+    mapLayers.push(line);
+  });
+  mapObj.fitBounds(routeBounds(shown),{padding:[24,24]});
+  setTimeout(()=>mapObj.invalidateSize(),120);
+}
+
+/* Used when the Leaflet CDN is unreachable - no tiles, but the shapes still read. */
+function drawMapSVG(host, R, newest){
   let minLa=90,maxLa=-90,minLo=180,maxLo=-180;
   R.forEach(r=>r.p.forEach(([la,lo])=>{
     if(la<minLa)minLa=la; if(la>maxLa)maxLa=la;
     if(lo<minLo)minLo=lo; if(lo>maxLo)maxLo=lo;}));
   const midLa=(minLa+maxLa)/2, kx=Math.cos(midLa*Math.PI/180);
-  const W=1000, H=560, pad=18;
-  const sx=(maxLo-minLo)*kx || 1e-6, sy=(maxLa-minLa) || 1e-6;
+  const W=1000,H=560,pad=18;
+  const sx=(maxLo-minLo)*kx||1e-6, sy=(maxLa-minLa)||1e-6;
   const scale=Math.min((W-pad*2)/sx,(H-pad*2)/sy);
   const ox=(W-sx*scale)/2, oy=(H-sy*scale)/2;
-  const X=lo=>ox+(lo-minLo)*kx*scale;
-  const Y=la=>H-(oy+(la-minLa)*scale);          // north up
-  const newest=R.reduce((a,b)=>a.d>b.d?a:b).d;
-  const paths=R.map(r=>{
-    const d=r.p.map(([la,lo],i)=>(i?'L':'M')+X(lo).toFixed(1)+' '+Y(la).toFixed(1)).join(' ');
-    const recent=r.d===newest;
-    return `<path d="${d}" fill="none" stroke="${recent?'#e8a33d':'#5b9bd8'}"
-      stroke-width="${recent?2.2:1.1}" stroke-opacity="${recent?0.95:0.30}"
-      stroke-linecap="round" stroke-linejoin="round"/>`;
-  }).join('');
-  return `<div class="card"><div class="ch-title">Where you ride</div>
-    <div class="ch-sub">${R.length} rides overlaid · the amber trace is the most recent</div>
-    <div class="mapwrap"><svg class="rmap" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet"
-      role="img" aria-label="All recorded routes overlaid">${paths}</svg></div></div>`;
+  const X=lo=>ox+(lo-minLo)*kx*scale, Y=la=>H-(oy+(la-minLa)*scale);
+  host.innerHTML=`<svg class="rmap" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${
+    R.map(r=>{
+      const d=r.p.map(([la,lo],i)=>(i?'L':'M')+X(lo).toFixed(1)+' '+Y(la).toFixed(1)).join(' ');
+      const rec=r.d===newest;
+      return `<path d="${d}" fill="none" stroke="${rec?'#e8a33d':'#5b9bd8'}"
+        stroke-width="${rec?2.2:1.1}" stroke-opacity="${rec?.95:.30}"
+        stroke-linecap="round" stroke-linejoin="round"/>`;}).join('')}</svg>`;
 }
 
 /* ----------------------------------------------------------- power curve */
@@ -1079,19 +1166,30 @@ async function load(){
 
   calAnchor=new Date(D.today.date+'T00:00:00');
 
+  // pair two panels side by side, but only when both actually exist
+  const pair=(a,b)=> (a&&b) ? `<div class="grid2">${a}${b}</div>` : (a||b||'');
+
   $('app').innerHTML =
       secForm() + secStats() + secCalendar()
-    + `<div class="grid2">${secWeekly()}${secMonthly()}</div>`
+    + pair(secWeekly(), secMonthly())
     + secRoutes()
-    + `<div class="grid2">${secPower()}${secYoY()}</div>`
+    + pair(secPower(), secYoY())
     + secZones()
-    + `<div class="grid2">${secStreaks()}${secWeather()}</div>`
-    + `<div class="grid2">${secWellness()}${secBests()}</div>`
+    + pair(secStreaks(), secWeather())
+    + pair(secWellness(), secBests())
     + secGear()
     + secRecent();
 
   drawStats();
   drawCalendar();
+  try{ drawMap(); }catch(e){ console.error('map failed:', e); }
+  const ms=$('map-seg');
+  if(ms) ms.addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b) return;
+    document.querySelectorAll('#map-seg button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); mapMode=b.dataset.m;
+    try{ drawMap(); }catch(err){ console.error(err); }
+  });
   try{ charts(); }catch(e){ console.error('charts failed:', e); }
 
   $('stat-seg').addEventListener('click',e=>{
