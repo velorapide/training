@@ -38,6 +38,8 @@ STREAM_RES = 300            # points per activity - enough for shape and 1min+ p
 ROUTE_POINTS = 110          # points kept per route after thinning
 PEAK_DURATIONS = [60, 300, 600, 1200, 3600]   # 1, 5, 10, 20, 60 min
 
+PROBE = {}                  # what the streams endpoint actually returned
+
 # Cloudflare fronts intervals.icu and rejects Python's default user agent
 # with a 1010 "access denied".
 USER_AGENTS = [
@@ -258,19 +260,34 @@ def fetch_streams(athlete, key, acts, cache):
     """Fill the cache with route + power peaks for rides we have not seen."""
     today = dt.date.today()
     floor = (today - dt.timedelta(days=ROUTE_DAYS)).isoformat()
+    # indoor rides carry no GPS but plenty of power, so they stay in
     wanted = [a for a in acts
               if a["date"] >= floor and a["id"] and str(a["id"]) not in cache
-              and not a["trainer"] and (a["meters"] or 0) > 500]
+              and (a["secs"] or 0) >= 600]
     fetched = 0
     for a in wanted[:MAX_NEW_STREAMS]:
         aid = str(a["id"])
-        try:
-            url = f"{BASE}/activity/{aid}/streams"
-            data = get_url(url, key, streams="latlng,watts", resolution=STREAM_RES)
-        except SystemExit:
-            raise
-        except Exception:
-            cache[aid] = {"r": [], "p": {}}
+        url = f"{BASE}/activity/{aid}/streams"
+        data = None
+        for params in ({"types": "latlng,watts", "resolution": STREAM_RES},
+                       {"streams": "latlng,watts", "resolution": STREAM_RES},
+                       {"types": "latlng,watts"}):
+            try:
+                data = get_url(url, key, **params)
+            except Exception:
+                data = None
+            if data:
+                if not PROBE.get("params"):
+                    PROBE["params"] = params
+                    PROBE["shape"] = (sorted(data.keys())[:12] if isinstance(data, dict)
+                                      else [str(type(data).__name__), len(data)])
+                    if isinstance(data, list) and data and isinstance(data[0], dict):
+                        PROBE["item_keys"] = sorted(data[0].keys())[:12]
+                break
+        if not data:
+            PROBE.setdefault("failures", 0)
+            PROBE["failures"] += 1
+            cache[aid] = {"r": [], "p": {}, "d": a["date"]}
             continue
         latlng, watts = None, None
         if isinstance(data, dict):
@@ -573,6 +590,9 @@ def build(athlete, key):
         "gear": sorted(gear_raw[0].keys()) if isinstance(gear_raw, list) and gear_raw else [],
         "streams_cached": len(cache),
         "streams_new_this_run": newly,
+        "streams_with_route": sum(1 for v in cache.values() if v.get("r")),
+        "streams_with_power": sum(1 for v in cache.values() if v.get("p")),
+        "streams_probe": PROBE,
         "event": sorted(events_raw[0].keys()) if events_raw else [],
         "wellness": sorted(wellness_raw[-1].keys()) if wellness_raw else [],
         "athlete": sorted(profile.keys()) if isinstance(profile, dict) else [],
@@ -645,9 +665,17 @@ def main():
     with open(tmp, "w") as fh:
         json.dump(data, fh, separators=(",", ":"))
     os.replace(tmp, out)
-    print(f"wrote {out} at {data['generated']}  "
-          f"({len(data['recent'])} recent, {len(data['weekly'])} weeks, "
-          f"{len(data['calendar'])} calendar days)")
+    f = data["_fields"]
+    print(f"wrote {out} at {data['generated']}")
+    print(f"  {len(data['recent'])} recent · {len(data['weekly'])} weeks · "
+          f"{len(data['calendar'])} calendar days")
+    print(f"  streams cached {f.get('streams_cached')} "
+          f"(new {f.get('streams_new_this_run')}) · "
+          f"routes {f.get('streams_with_route')} · power {f.get('streams_with_power')}")
+    print(f"  streams probe: {json.dumps(f.get('streams_probe'))}")
+    print(f"  gear {len(data['gear'])} · weather rows {len(data['weather'])}")
+    if not data["power_curve"]["all"]:
+        print("::warning::No power peaks - the streams endpoint returned nothing usable")
 
 
 if __name__ == "__main__":
