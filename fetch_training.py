@@ -252,22 +252,57 @@ def route_from_streams(sm):
 
 
 def route_from_latlng(stream):
-    """[[lat,lon],...] -> thinned, rounded route. 4 dp is about 11 m."""
-    pts = []
-    for p in stream or []:
+    """
+    Turn a GPS stream into a thinned, rounded route.
+
+    Copes with: [[lat,lon],...], [{lat,lng},...], [{latitude,longitude},...],
+    and a flat [lat,lon,lat,lon,...] array. 4 dp is about 11 m.
+    """
+    if not stream:
+        return []
+
+    # record a raw sample once, so a future mismatch is diagnosable
+    if "latlng_sample" not in PROBE:
         try:
-            if isinstance(p, dict):
-                lat, lon = p.get("lat"), p.get("lng", p.get("lon"))
-            else:
-                lat, lon = p[0], p[1]
-            if lat is None or lon is None:
-                continue
-            lat, lon = float(lat), float(lon)
-            if lat == 0 and lon == 0:
-                continue
-            pts.append([round(lat, 4), round(lon, 4)])
-        except (TypeError, ValueError, IndexError):
+            PROBE["latlng_sample"] = json.loads(json.dumps(stream[:3]))
+        except (TypeError, ValueError):
+            PROBE["latlng_sample"] = [str(x)[:60] for x in stream[:3]]
+
+    head = [x for x in stream[:8] if x is not None]
+    flat = bool(head) and all(isinstance(x, (int, float)) for x in head)
+    if flat:
+        pairs = [(stream[i], stream[i + 1]) for i in range(0, len(stream) - 1, 2)]
+    else:
+        pairs = stream
+
+    pts = []
+    for p in pairs:
+        lat = lon = None
+        if isinstance(p, dict):
+            for k in ("lat", "latitude", "y"):
+                if p.get(k) is not None:
+                    lat = p[k]; break
+            for k in ("lng", "lon", "long", "longitude", "x"):
+                if p.get(k) is not None:
+                    lon = p[k]; break
+        elif isinstance(p, (list, tuple)) and len(p) >= 2:
+            lat, lon = p[0], p[1]
+        if lat is None or lon is None:
             continue
+        try:
+            lat, lon = float(lat), float(lon)
+        except (TypeError, ValueError):
+            continue
+        if lat == 0 and lon == 0:
+            continue
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            lat, lon = lon, lat                     # swapped order
+            if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                continue
+        pts.append([round(lat, 4), round(lon, 4)])
+
+    if pts and "latlng_parsed" not in PROBE:
+        PROBE["latlng_parsed"] = {"flat": flat, "points": len(pts), "first": pts[0]}
     return thin(pts, ROUTE_POINTS)
 
 
