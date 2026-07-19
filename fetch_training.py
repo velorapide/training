@@ -32,6 +32,13 @@ BENCHMARK_WORDS = ("ftp test", "ramp test", "20 min test", "20min test",
                    "benchmark", "race", "time trial")
 
 CACHE_PATH = os.environ.get("STREAM_CACHE", ".cache/streams.json")
+# Bump this whenever the parsing changes. Anything cached by an older version is
+# discarded automatically, so stale results can never survive a fix.
+CACHE_VERSION = 5
+
+# How the GPS stream orders its numbers. "auto" guesses; set it explicitly to
+# "lat_first" or "lon_first" if the map comes out in the wrong hemisphere.
+LATLNG_ORDER = os.environ.get("LATLNG_ORDER", "auto")
 ROUTE_DAYS = 365            # how far back to draw routes
 MAX_NEW_STREAMS = 30        # new rides fetched per run, so a run never drags
 STREAM_RES = 300            # points per activity - enough for shape and 1min+ power
@@ -186,12 +193,18 @@ def zone_seconds(act):
 def load_cache():
     try:
         with open(CACHE_PATH) as fh:
-            return json.load(fh)
+            data = json.load(fh)
     except (OSError, ValueError):
-        return {}
+        return {"_v": CACHE_VERSION}
+    if not isinstance(data, dict) or data.get("_v") != CACHE_VERSION:
+        print(f"cache version {(data or {}).get('_v') if isinstance(data, dict) else '?'}"
+              f" != {CACHE_VERSION} - discarding and refetching")
+        return {"_v": CACHE_VERSION}
+    return data
 
 
 def save_cache(cache):
+    cache["_v"] = CACHE_VERSION
     d = os.path.dirname(os.path.abspath(CACHE_PATH))
     if d:
         os.makedirs(d, exist_ok=True)
@@ -279,14 +292,50 @@ def route_from_latlng(stream):
         jumps = sum(1 for i in range(len(vals) - 1) if abs(vals[i + 1] - vals[i]) > 1.0)
         if len(vals) >= 4 and jumps <= 2:
             half = len(vals) // 2
-            pairs = list(zip(vals[:half], vals[half:half * 2]))
-            layout = "concatenated"
+            a, b = vals[:half], vals[half:half * 2]
+            # Which half holds the latitudes? Anything beyond +/-90 cannot be one.
+            if LATLNG_ORDER == "lon_first":
+                a, b = b, a
+                layout = "concatenated:lon-first (forced)"
+                pairs = list(zip(a, b))
+                return _finish(pairs, flat, layout)
+            if LATLNG_ORDER == "lat_first":
+                layout = "concatenated:lat-first (forced)"
+                pairs = list(zip(a, b))
+                return _finish(pairs, flat, layout)
+            a_lat = all(-90 <= v <= 90 for v in a)
+            b_lat = all(-90 <= v <= 90 for v in b)
+            if b_lat and not a_lat:
+                a, b = b, a                     # first half was the longitudes
+                layout = "concatenated:lon-first"
+            elif a_lat and not b_lat:
+                layout = "concatenated:lat-first"
+            else:
+                # both plausible as latitude: the wider spread is the longitude,
+                # since a degree of longitude covers less ground at this latitude
+                if (max(a) - min(a)) > (max(b) - min(b)):
+                    a, b = b, a
+                    layout = "concatenated:lon-first?"
+                else:
+                    layout = "concatenated:lat-first?"
+            pairs = list(zip(a, b))
         else:
-            pairs = [(vals[i], vals[i + 1]) for i in range(0, len(vals) - 1, 2)]
-            layout = "interleaved"
+            e, o = vals[0::2], vals[1::2]
+            n = min(len(e), len(o))
+            e, o = e[:n], o[:n]
+            if all(-90 <= v <= 90 for v in o) and not all(-90 <= v <= 90 for v in e):
+                e, o = o, e
+                layout = "interleaved:lon-first"
+            else:
+                layout = "interleaved:lat-first"
+            pairs = list(zip(e, o))
     else:
         pairs = stream
 
+    return _finish(pairs, flat, layout)
+
+
+def _finish(pairs, flat, layout):
     pts = []
     for p in pairs:
         lat = lon = None
@@ -308,9 +357,7 @@ def route_from_latlng(stream):
         if lat == 0 and lon == 0:
             continue
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-            lat, lon = lon, lat                     # swapped order
-            if not (-90 <= lat <= 90 and -180 <= lon <= 180):
-                continue
+            continue
         pts.append([round(lat, 4), round(lon, 4)])
 
     if pts and "latlng_parsed" not in PROBE:
@@ -394,7 +441,8 @@ def fetch_streams(athlete, key, acts, cache):
         }
         fetched += 1
     # forget anything older than the route window so the cache cannot grow forever
-    for k in [k for k, v in cache.items() if isinstance(v, dict) and v.get("d", "9") < floor]:
+    for k in [k for k, v in cache.items()
+              if k != "_v" and isinstance(v, dict) and v.get("d", "9") < floor]:
         del cache[k]
     return fetched
 
@@ -631,7 +679,7 @@ def build(athlete, key):
     routes, peaks_by_act = [], {}
     for a in acts:
         c = cache.get(str(a["id"]))
-        if not c:
+        if not isinstance(c, dict):
             continue
         if c.get("r"):
             routes.append({"d": a["date"], "p": c["r"]})
@@ -674,10 +722,13 @@ def build(athlete, key):
     fields = {
         "activity": sorted(acts_raw[0].keys()) if acts_raw else [],
         "gear": sorted(gear_raw[0].keys()) if isinstance(gear_raw, list) and gear_raw else [],
-        "streams_cached": len(cache),
+        "streams_cached": sum(1 for k in cache if k != "_v"),
+        "cache_version": CACHE_VERSION,
         "streams_new_this_run": newly,
-        "streams_with_route": sum(1 for v in cache.values() if v.get("r")),
-        "streams_with_power": sum(1 for v in cache.values() if v.get("p")),
+        "streams_with_route": sum(1 for v in cache.values()
+                                  if isinstance(v, dict) and v.get("r")),
+        "streams_with_power": sum(1 for v in cache.values()
+                                  if isinstance(v, dict) and v.get("p")),
         "streams_probe": PROBE,
         "event": sorted(events_raw[0].keys()) if events_raw else [],
         "wellness": sorted(wellness_raw[-1].keys()) if wellness_raw else [],
