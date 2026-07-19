@@ -210,6 +210,47 @@ def thin(points, keep):
     return out
 
 
+def unwrap(v):
+    """A stream may be a bare list, or {'data': [...]}, or {'values': [...]}."""
+    if isinstance(v, dict):
+        for k in ("data", "values", "stream", "points"):
+            if isinstance(v.get(k), list):
+                return v[k]
+        return None
+    return v if isinstance(v, list) else None
+
+
+def stream_map(data):
+    """Normalise the whole response into {name: [values]} and note what was there."""
+    out = {}
+    if isinstance(data, dict):
+        for k, v in data.items():
+            lst = unwrap(v)
+            if lst is not None:
+                out[k] = lst
+    elif isinstance(data, list):
+        for st in data:
+            if isinstance(st, dict):
+                name = st.get("type") or st.get("name")
+                lst = unwrap(st.get("data", st.get("values")))
+                if name and lst is not None:
+                    out[name] = lst
+    return out
+
+
+def route_from_streams(sm):
+    """Find GPS under any of the names intervals.icu might use."""
+    for key in ("latlng", "latLng", "position", "gps", "coordinates"):
+        if key in sm:
+            return route_from_latlng(sm[key])
+    # some accounts expose latitude and longitude as separate streams
+    lat_key = next((k for k in ("lat", "latitude", "position_lat") if k in sm), None)
+    lon_key = next((k for k in ("lng", "lon", "longitude", "position_long") if k in sm), None)
+    if lat_key and lon_key:
+        return route_from_latlng(list(zip(sm[lat_key], sm[lon_key])))
+    return []
+
+
 def route_from_latlng(stream):
     """[[lat,lon],...] -> thinned, rounded route. 4 dp is about 11 m."""
     pts = []
@@ -269,7 +310,9 @@ def fetch_streams(athlete, key, acts, cache):
         aid = str(a["id"])
         url = f"{BASE}/activity/{aid}/streams"
         data = None
-        for params in ({"types": "latlng,watts", "resolution": STREAM_RES},
+        # no type filter on the first attempt: let the API say what it has
+        for params in ({"resolution": STREAM_RES},
+                       {"types": "latlng,lat,lng,watts", "resolution": STREAM_RES},
                        {"streams": "latlng,watts", "resolution": STREAM_RES},
                        {"types": "latlng,watts"}):
             try:
@@ -277,32 +320,27 @@ def fetch_streams(athlete, key, acts, cache):
             except Exception:
                 data = None
             if data:
-                if not PROBE.get("params"):
-                    PROBE["params"] = params
-                    PROBE["shape"] = (sorted(data.keys())[:12] if isinstance(data, dict)
-                                      else [str(type(data).__name__), len(data)])
-                    if isinstance(data, list) and data and isinstance(data[0], dict):
-                        PROBE["item_keys"] = sorted(data[0].keys())[:12]
-                break
+                sm_probe = stream_map(data)
+                if sm_probe:
+                    if not PROBE.get("params"):
+                        PROBE["params"] = params
+                        PROBE["container"] = type(data).__name__
+                        PROBE["stream_names"] = sorted(sm_probe.keys())[:25]
+                    break
+                data = None
         if not data:
             PROBE.setdefault("failures", 0)
             PROBE["failures"] += 1
             cache[aid] = {"r": [], "p": {}, "d": a["date"]}
             continue
-        latlng, watts = None, None
-        if isinstance(data, dict):
-            latlng = data.get("latlng"); watts = data.get("watts")
-        elif isinstance(data, list):
-            for st in data:
-                if not isinstance(st, dict):
-                    continue
-                t = st.get("type") or st.get("name")
-                if t == "latlng":
-                    latlng = st.get("data")
-                elif t == "watts":
-                    watts = st.get("data")
+        sm = stream_map(data)
+        watts = None
+        for k in ("watts", "power", "watts_calc"):
+            if k in sm:
+                watts = sm[k]
+                break
         cache[aid] = {
-            "r": route_from_latlng(latlng),
+            "r": route_from_streams(sm),
             "p": peaks_from_watts(watts, a["secs"]),
             "d": a["date"],
         }
