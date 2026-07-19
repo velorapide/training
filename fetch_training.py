@@ -270,8 +270,20 @@ def route_from_latlng(stream):
 
     head = [x for x in stream[:8] if x is not None]
     flat = bool(head) and all(isinstance(x, (int, float)) for x in head)
+    layout = None
     if flat:
-        pairs = [(stream[i], stream[i + 1]) for i in range(0, len(stream) - 1, 2)]
+        vals = [v for v in stream if isinstance(v, (int, float))]
+        # Two ways a flat array can be laid out:
+        #   interleaved   lat, lon, lat, lon, ...   -> a big jump at every step
+        #   concatenated  lat x n, then lon x n     -> exactly one jump, at the midpoint
+        jumps = sum(1 for i in range(len(vals) - 1) if abs(vals[i + 1] - vals[i]) > 1.0)
+        if len(vals) >= 4 and jumps <= 2:
+            half = len(vals) // 2
+            pairs = list(zip(vals[:half], vals[half:half * 2]))
+            layout = "concatenated"
+        else:
+            pairs = [(vals[i], vals[i + 1]) for i in range(0, len(vals) - 1, 2)]
+            layout = "interleaved"
     else:
         pairs = stream
 
@@ -302,7 +314,8 @@ def route_from_latlng(stream):
         pts.append([round(lat, 4), round(lon, 4)])
 
     if pts and "latlng_parsed" not in PROBE:
-        PROBE["latlng_parsed"] = {"flat": flat, "points": len(pts), "first": pts[0]}
+        PROBE["latlng_parsed"] = {"flat": flat, "layout": layout,
+                                  "points": len(pts), "first": pts[0]}
     return thin(pts, ROUTE_POINTS)
 
 
